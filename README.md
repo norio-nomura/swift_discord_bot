@@ -42,9 +42,9 @@ This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com
 
 ### Build time configuration
 
-| Variable Name  | Description                                | default                     |
-| -------------- | ------------------------------------------ | --------------------------- |
-| `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:latest                |
+| Variable Name  | Description                                | default                            |
+| -------------- | ------------------------------------------ | ---------------------------------- |
+| `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:5.6 |
 
 ### Environment variables for run time configurations
 
