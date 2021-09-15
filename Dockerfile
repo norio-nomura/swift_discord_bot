@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG DOCKER_IMAGE=swift:jammy
+ARG DOCKER_IMAGE=swift:bionic
 FROM ${DOCKER_IMAGE}
 ARG USERNAME=bot
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
