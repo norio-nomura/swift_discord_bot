@@ -44,7 +44,7 @@ This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com
 
 | Variable Name  | Description                                | default                     |
 | -------------- | ------------------------------------------ | --------------------------- |
-| `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:latest                |
+| `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:5.4                |
 
 ### Environment variables for run time configurations
 
