@@ -46,7 +46,7 @@ This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com
 
 | Variable Name  | Description                                | default                     |
 | -------------- | ------------------------------------------ | --------------------------- |
-| `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:jammy                 |
+| `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:xenial                |
 
 #### Using swift-DEVELOPMENT-SNAPSHOTS-* tarball
 
