@@ -2,5 +2,5 @@ build:
   docker:
     worker: Dockerfile
   config:
-    DOCKER_IMAGE: swift:latest
+    DOCKER_IMAGE: swift:4.1
 
