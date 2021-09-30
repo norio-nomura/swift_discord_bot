@@ -1,7 +1,8 @@
 services:
   - type: web
-    name: swift_discord_bot
+    name: swift52-discord-bot
     env: docker
+    region: ohio
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /
@@ -13,7 +14,7 @@ services:
       - key: DISCORD_TOKEN
         sync: false
       - key: DOCKER_IMAGE
-        sync: false
+        value: swift:5.2
       - key: GITHUB_TOKEN
         sync: false
       - key: SWIFT_WEBROOT
