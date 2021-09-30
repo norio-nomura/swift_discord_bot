@@ -1,6 +1,6 @@
 build:
   docker:
-    worker: Dockerfile
+    worker: Dockerfile.nightly
   config:
-    DOCKER_IMAGE: swift:latest
+    SWIFT_WEBROOT: https://download.swift.org/development
 
