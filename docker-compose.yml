@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        DOCKER_IMAGE: swift
-        # SWIFT_WEBROOT: https://download.swift.org/development
+        # DOCKER_IMAGE: swift
+        SWIFT_WEBROOT: https://download.swift.org/development
       target: production
     environment:
       - ATTACHMENT_EXTENSION_TO_TREAT_AS_INPUT=.swift
