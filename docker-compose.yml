@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: ${DOCKER_FILE:-Dockerfile}
       args:
-        DOCKER_IMAGE: ${DOCKER_IMAGE:-swift:latest}
+        DOCKER_IMAGE: ${DOCKER_IMAGE:-swift:5.7}
         SWIFT_WEBROOT: ${SWIFT_WEBROOT:-https://download.swift.org/development}
     environment:
       - ATTACHMENT_EXTENSION_TO_TREAT_AS_INPUT=.swift
