@@ -2,10 +2,11 @@ services:
   observant:
     build:
       args:
-        DOCKER_IMAGE: swift
+        DOCKER_IMAGE: swift:5.7
+        PLATFORM_CODENAME: jammy
         SWIFT_WEBROOT: https://download.swift.org/development
         USE_SNAPSHOT: false
-        USE_SWIFT_SDKS: true
+        USE_SWIFT_SDKS: false
       platforms:
         - linux/amd64
         - linux/arm64
