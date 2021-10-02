@@ -1,4 +1,4 @@
-import { startCLIBot } from "./mod.ts";
+import { startCLIBot } from "./deps.ts";
 
 startCLIBot({
   // Set options here
