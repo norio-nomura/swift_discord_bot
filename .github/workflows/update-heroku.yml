@@ -1,0 +1,59 @@
+name: Update Heroku
+
+on:
+  schedule:
+    - cron: "20 0,3,6,9,12,15,18,21 * * *"
+  workflow_dispatch:
+    inputs:
+      force-update:
+        description: Force Update Heroku
+        required: false
+        default: false
+
+jobs:
+  update_heroku:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        id: ['nightly', '5.5', '5.4', '5.3', '5.2', '5.1', '5.0', '4.2', '4.1']
+        include:
+          - id: 'nightly'
+            repository: 'swiftlang/swift'
+          - id: '5.5'
+            repository: 'swiftlang/swift'
+            tag: 'nightly-5.5'
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0 # Using default '1' causes creating detached branch on Forrce Push Commit.
+          ref: swift/${{ matrix.id }}
+
+      - name: Check Commit
+        id: check-commit
+        run: |
+          timestamp=$(git show -s --format=%ct) &&
+          echo "::set-output name=timestamp::${timestamp}"
+
+      - name: Check Docker Image
+        id: check-image
+        env:
+          ID: ${{ matrix.id }}
+          REPOSITORY: ${{ matrix.repository }}
+          TAG: ${{ matrix.tag }}
+        run: |
+          REPOSITORY=${REPOSITORY:-library/swift}
+          TAG=${TAG:-${ID}}
+          endpoint="https://hub.docker.com/v2/repositories/${REPOSITORY}/tags/${TAG}"
+          tag_last_pushed=$(curl --silent "${endpoint}"|jq -r .tag_last_pushed) &&
+          timestamp=$(date -d "${tag_last_pushed}" "+%s") &&
+          echo "::set-output name=timestamp::${timestamp}"
+
+      - name: Force Push Commit
+        if: ${{ steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp || github.event.inputs.force-update }}
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git commit --amend --no-edit
+          git push --force
