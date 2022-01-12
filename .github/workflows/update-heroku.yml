@@ -16,10 +16,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        id: ['nightly', '5.5', '5.4', '5.3', '5.2', '5.1', '5.0', '4.2', '4.1']
+        id: ['nightly', '5.6', '5.5', '5.4', '5.3', '5.2', '5.1', '5.0', '4.2']
         include:
           - id: 'nightly'
             repository: 'swiftlang/swift'
+          - id: '5.6'
+            repository: 'swiftlang/swift'
+            tag: 'nightly-5.6-bionic'
           - id: '5.5'
             repository: 'swiftlang/swift'
             tag: 'nightly-5.5'
