@@ -23,9 +23,6 @@ jobs:
           - id: '5.6'
             repository: 'swiftlang/swift'
             tag: 'nightly-5.6-bionic'
-          - id: '5.5'
-            repository: 'swiftlang/swift'
-            tag: 'nightly-5.5'
 
     steps:
       - uses: actions/checkout@v2
