@@ -20,9 +20,6 @@ jobs:
         include:
           - id: 'nightly'
             repository: 'swiftlang/swift'
-          - id: '5.6'
-            repository: 'swiftlang/swift'
-            tag: 'nightly-5.6-bionic'
 
     steps:
       - uses: actions/checkout@v2
