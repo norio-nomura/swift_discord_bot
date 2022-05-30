@@ -20,6 +20,7 @@ jobs:
         include:
           - id: 'nightly'
             repository: 'swiftlang/swift'
+            tag: 'nightly-main-focal'
 
     steps:
       - uses: actions/checkout@v2
