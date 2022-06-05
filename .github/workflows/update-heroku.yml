@@ -16,10 +16,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        id: ['nightly', '5.6', '5.5', '5.4', '5.3', '5.2', '5.1', '5.0', '4.2']
+        id: ['nightly', '5.7', '5.6', '5.5', '5.4', '5.3', '5.2', '5.1', '5.0', '4.2']
         include:
           - id: 'nightly'
             swift_webroot: 'https://download.swift.org/development/ubuntu2004'
+          - id: '5.7'
+            swift_webroot: 'https://download.swift.org/swift-5.7-branch/ubuntu2004'
 
     steps:
       - uses: actions/checkout@v2
