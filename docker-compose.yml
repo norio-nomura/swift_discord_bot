@@ -4,9 +4,10 @@ services:
     user: bot
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ${DOCKER_FILE:-Dockerfile}
       args:
         DOCKER_IMAGE: ${DOCKER_IMAGE:-swift:latest}
+        SWIFT_WEBROOT: ${SWIFT_WEBROOT:-https://download.swift.org/development}
     
     environment:
       - DISCORD_NICKNAME

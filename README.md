@@ -42,9 +42,18 @@ This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com
 
 ### Build time configuration
 
+#### Using Official Docker Image
+
 | Variable Name  | Description                                | default                     |
 | -------------- | ------------------------------------------ | --------------------------- |
 | `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:latest                |
+
+#### Using swift-DEVELOPMENT-SNAPSHOTS-* tarball
+
+| Variable Name   | Description                               | default                                |
+| --------------- | ----------------------------------------- | -------------------------------------- |
+| `DOCKER_FILE`   | Use `Dockerfile.nightly` for this feature | Dockerfile                             |
+| `SWIFT_WEBROOT` | Webroot getting Swift toolcahin tar ball  | https://download.swift.org/development |
 
 ### Environment variables for run time configurations
 

@@ -19,8 +19,7 @@ jobs:
         id: ['nightly', '5.6', '5.5', '5.4', '5.3', '5.2', '5.1', '5.0', '4.2']
         include:
           - id: 'nightly'
-            repository: 'swiftlang/swift'
-            tag: 'nightly-main-focal'
+            swift_webroot: 'https://download.swift.org/development/ubuntu2004'
 
     steps:
       - uses: actions/checkout@v2
@@ -29,12 +28,14 @@ jobs:
           ref: swift/${{ matrix.id }}
 
       - name: Check Commit
+        if: ${{ !github.event.inputs.force-update }}
         id: check-commit
         run: |
           timestamp=$(git show -s --format=%ct) &&
           echo "::set-output name=timestamp::${timestamp}"
 
       - name: Check Docker Image
+        if: ${{ !github.event.inputs.force-update && !startsWith(matrix.swift_webroot, 'https:') }}
         id: check-image
         env:
           ID: ${{ matrix.id }}
@@ -48,8 +49,20 @@ jobs:
           timestamp=$(date -d "${tag_last_pushed}" "+%s") &&
           echo "::set-output name=timestamp::${timestamp}"
 
+      - name: Check Development Snapshots
+        if: ${{ !github.event.inputs.force-update && startsWith(matrix.swift_webroot, 'https:') }}
+        id: check-snapshot
+        run: |
+          endpoint="${{ matrix.swift_webroot }}/latest-build.yml"
+          latest_build_date=$(curl --silent "${endpoint}"|sed -n '/^date:/s/date: *//p') &&
+          timestamp=$(date -d "${latest_build_date}" "+%s") &&
+          echo "::set-output name=timestamp::${timestamp}"
+
       - name: Force Push Commit
-        if: ${{ steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp || github.event.inputs.force-update }}
+        if: >
+          github.event.inputs.force-update ||
+          steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp ||
+          steps.check-commit.outputs.timestamp < steps.check-snapshot.outputs.timestamp
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
