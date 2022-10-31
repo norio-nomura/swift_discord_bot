@@ -27,7 +27,7 @@ jobs:
             swift_webroot: 'https://download.swift.org/swift-5.7-branch/ubuntu2004'
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # Using default '1' causes creating detached branch on Forrce Push Commit.
           ref: swift/${{ matrix.id }}
