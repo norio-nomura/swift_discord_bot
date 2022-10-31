@@ -9,9 +9,8 @@ on:
   workflow_dispatch:
     inputs:
       force-update:
-        description: Force Update Heroku
+        description: Specify id or `all` to force updating Heroku
         required: false
-        default: false
 
 jobs:
   update_heroku:
@@ -65,8 +64,11 @@ jobs:
 
       - name: Verify Timestamps
         if: >
-          steps.check-commit.outputs.timestamp == null ||
-          (steps.check-image.outputs.timestamp == null && steps.check-snapshot.outputs.timestamp == null )
+          !github.event.inputs.force-update &&
+          (
+            steps.check-commit.outputs.timestamp == null ||
+            (steps.check-image.outputs.timestamp == null && steps.check-snapshot.outputs.timestamp == null )
+          )
         run: |
           echo "steps.check-commit.outputs.timestamp: ${{ steps.check-commit.outputs.timestamp }}"
           echo "steps.check-image.outputs.timestamp: ${{ steps.check-image.outputs.timestamp }}"
@@ -75,7 +77,8 @@ jobs:
 
       - name: Force Push Commit
         if: >
-          github.event.inputs.force-update ||
+          contains(github.event.inputs.force-update, 'all') ||
+          contains(github.event.inputs.force-update, matrix.id)  ||
           steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp ||
           steps.check-commit.outputs.timestamp < steps.check-snapshot.outputs.timestamp
         run: |
