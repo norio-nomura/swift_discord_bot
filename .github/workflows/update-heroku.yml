@@ -1,6 +1,9 @@
 name: Update Heroku
 
 on:
+  pull_request:
+    branches:
+      - main
   schedule:
     - cron: "20 0,3,6,9,12,15,18,21 * * *"
   workflow_dispatch:
@@ -59,6 +62,16 @@ jobs:
           latest_build_date=$(curl --silent "${endpoint}"|sed -n '/^date:/s/date: *//p') &&
           timestamp=$(date -d "${latest_build_date}" "+%s") &&
           echo "::set-output name=timestamp::${timestamp}"
+
+      - name: Verify Timestamps
+        if: >
+          steps.check-commit.outputs.timestamp == null ||
+          (steps.check-image.outputs.timestamp == null && steps.check-snapshot.outputs.timestamp == null )
+        run: |
+          echo "steps.check-commit.outputs.timestamp: ${{ steps.check-commit.outputs.timestamp }}"
+          echo "steps.check-image.outputs.timestamp: ${{ steps.check-image.outputs.timestamp }}"
+          echo "steps.check-snapshot.outputs.timestamp: ${{ steps.check-snapshot.outputs.timestamp }}"
+          false
 
       - name: Force Push Commit
         if: >
