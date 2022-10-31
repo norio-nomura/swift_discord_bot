@@ -32,14 +32,14 @@ jobs:
           ref: swift/${{ matrix.id }}
 
       - name: Check Commit
-        if: ${{ !github.event.inputs.force-update }}
+        if: ${{ !inputs.force-update }}
         id: check-commit
         run: |
           timestamp=$(git show -s --format=%ct) &&
           echo "timestamp=${timestamp}" >> $GITHUB_OUTPUT
 
       - name: Check Docker Image
-        if: ${{ !github.event.inputs.force-update && !startsWith(matrix.swift_webroot, 'https:') }}
+        if: ${{ !inputs.force-update && !startsWith(matrix.swift_webroot, 'https:') }}
         id: check-image
         env:
           ID: ${{ matrix.id }}
@@ -54,7 +54,7 @@ jobs:
           echo "timestamp=${timestamp}" >> $GITHUB_OUTPUT
 
       - name: Check Development Snapshots
-        if: ${{ !github.event.inputs.force-update && startsWith(matrix.swift_webroot, 'https:') }}
+        if: ${{ !inputs.force-update && startsWith(matrix.swift_webroot, 'https:') }}
         id: check-snapshot
         run: |
           endpoint="${{ matrix.swift_webroot }}/latest-build.yml"
@@ -64,7 +64,7 @@ jobs:
 
       - name: Verify Timestamps
         if: >
-          !github.event.inputs.force-update &&
+          !inputs.force-update &&
           (
             steps.check-commit.outputs.timestamp == null ||
             (steps.check-image.outputs.timestamp == null && steps.check-snapshot.outputs.timestamp == null )
@@ -77,8 +77,8 @@ jobs:
 
       - name: Force Push Commit
         if: >
-          contains(github.event.inputs.force-update, 'all') ||
-          contains(github.event.inputs.force-update, matrix.id)  ||
+          contains(inputs.force-update, 'all') ||
+          contains(inputs.force-update, matrix.id)  ||
           steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp ||
           steps.check-commit.outputs.timestamp < steps.check-snapshot.outputs.timestamp
         run: |
