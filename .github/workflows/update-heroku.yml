@@ -37,7 +37,7 @@ jobs:
         id: check-commit
         run: |
           timestamp=$(git show -s --format=%ct) &&
-          echo "::set-output name=timestamp::${timestamp}"
+          echo "timestamp=${timestamp}"
 
       - name: Check Docker Image
         if: ${{ !github.event.inputs.force-update && !startsWith(matrix.swift_webroot, 'https:') }}
@@ -52,7 +52,7 @@ jobs:
           endpoint="https://hub.docker.com/v2/repositories/${REPOSITORY}/tags/${TAG}"
           tag_last_pushed=$(curl --silent "${endpoint}"|jq -r .tag_last_pushed) &&
           timestamp=$(date -d "${tag_last_pushed}" "+%s") &&
-          echo "::set-output name=timestamp::${timestamp}"
+          echo "timestamp=${timestamp}"
 
       - name: Check Development Snapshots
         if: ${{ !github.event.inputs.force-update && startsWith(matrix.swift_webroot, 'https:') }}
@@ -61,7 +61,7 @@ jobs:
           endpoint="${{ matrix.swift_webroot }}/latest-build.yml"
           latest_build_date=$(curl --silent "${endpoint}"|sed -n '/^date:/s/date: *//p') &&
           timestamp=$(date -d "${latest_build_date}" "+%s") &&
-          echo "::set-output name=timestamp::${timestamp}"
+          echo "timestamp=${timestamp}"
 
       - name: Verify Timestamps
         if: >
