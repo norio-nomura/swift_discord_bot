@@ -22,8 +22,6 @@ jobs:
         include:
           - id: 'nightly'
             swift_webroot: 'https://download.swift.org/development/ubuntu2004'
-          - id: '5.7'
-            swift_webroot: 'https://download.swift.org/swift-5.7-branch/ubuntu2004'
 
     steps:
       - uses: actions/checkout@v3
