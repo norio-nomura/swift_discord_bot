@@ -16,6 +16,7 @@ services:
       - ENV_ARGS
       - ENV_COMMAND
       # - GITHUB_TOKEN # should be provided by .env
+      - PORT=8081
       - TARGET_ARGS_TO_USE_STDIN
       - TARGET_CLI
       - TARGET_DEFAULT_ARGS
@@ -24,3 +25,5 @@ services:
 
     env_file: .env
     tty: true
+    ports:
+      - "8081:8081"

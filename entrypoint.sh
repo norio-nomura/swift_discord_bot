@@ -44,8 +44,8 @@ ${TARGET_DEFAULT_ARGS+TARGET_DEFAULT_ARGS: '${TARGET_DEFAULT_ARGS}', }\
 ${TIMEOUT_ARGS+TIMEOUT_ARGS: '${TIMEOUT_ARGS}', }\
 ${TIMEOUT_COMMAND+TIMEOUT_COMMAND: '${TIMEOUT_COMMAND}', }\
 "
-exec env -i PATH=${PATH} DENO_TLS_CA_STORE=system deno run \
-    --allow-env=PATH \
+exec env -i PATH=${PATH} PORT=${PORT} DENO_TLS_CA_STORE=system deno run \
+    --allow-env=PATH,PORT \
     --allow-net \
     --allow-run=/usr/bin/env \
     --quiet \
