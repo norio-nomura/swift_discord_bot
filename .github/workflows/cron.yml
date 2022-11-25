@@ -1,0 +1,17 @@
+name: cron
+
+on:
+  schedule:
+    - cron: "0/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          targets=(${{ secrets.TARGET_HOSTS }})
+          for target in ${targets[@]}; do
+            curl --max-time 5 --silent https://${target} || true
+            sleep 10
+          done
