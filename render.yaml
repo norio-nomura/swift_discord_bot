@@ -16,4 +16,6 @@ services:
         sync: false
       - key: GITHUB_TOKEN
         sync: false
+      - key: SWIFT_WEBROOT
+        sync: false
  
