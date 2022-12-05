@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: swift_discord_bot
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: DISCORD_NICKNAME
+        sync: false
+      - key: DISCORD_PLAYING
+        sync: false
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DOCKER_IMAGE
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: SWIFT_WEBROOT
+        sync: false
+ 
