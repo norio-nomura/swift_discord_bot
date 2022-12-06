@@ -73,11 +73,13 @@ jobs:
           echo "steps.check-snapshot.outputs.timestamp: ${{ steps.check-snapshot.outputs.timestamp }}"
           false
 
-      - name: Build Deploy Hook Secret Name
-        id: build-secret-name
+      - name: Build Render Secret Name
+        id: render-secret-name
+        env:
+          ID: ${{ matrix.id }}
         run: |
-          name="DEPLOY_HOOK_${{ matrix.id }}"
-          echo "name=${name/.}" >> $GITHUB_OUTPUT
+          echo "api_key=RENDER_API_KEY_${ID/.}" >> $GITHUB_OUTPUT
+          echo "service_id=RENDER_SERVICE_ID_${ID/.}" >> $GITHUB_OUTPUT
 
       - name: Trigger Deploy And Force Push Commit
         if: >
@@ -85,8 +87,17 @@ jobs:
           contains(inputs.force-update, matrix.id)  ||
           steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp ||
           steps.check-commit.outputs.timestamp < steps.check-snapshot.outputs.timestamp
+        env:
+          RENDER_API_KEY: ${{ secrets[steps.render-secret-name.outputs.api_key] }}
+          RENDER_SERVICE_ID: ${{ secrets[steps.render-secret-name.outputs.service_id] }}
         run: |
-          curl ${{ secrets[steps.build-secret-name.outputs.name] }}
+          test -n "${RENDER_API_KEY}" -a -n "${RENDER_SERVICE_ID}"
+          curl --request POST \
+          --url https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys \
+          --header 'accept: application/json' \
+          --header "authorization: Bearer ${RENDER_API_KEY}" \
+          --header 'content-type: application/json' \
+          --data '{"clearCache": "clear"}'
           git config user.name github-actions
           git config user.email github-actions@github.com
           git commit --amend --no-edit
