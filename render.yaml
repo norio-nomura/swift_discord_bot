@@ -18,4 +18,4 @@ services:
         sync: false
       - key: SWIFT_WEBROOT
         sync: false
- 
+    autoDeploy: false
