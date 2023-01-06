@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG DOCKER_IMAGE=ubuntu:18.04
+ARG DOCKER_IMAGE=ubuntu:22.04
 FROM ${DOCKER_IMAGE}
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
     export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && \
