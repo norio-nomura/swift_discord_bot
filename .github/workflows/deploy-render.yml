@@ -1,0 +1,24 @@
+name: Deploy Render
+
+on:
+  push:
+    branches:
+      - 'swift/**'
+
+jobs:
+  deploy_render:
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    steps:
+      - name: Trigger Deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          test -n "${RENDER_API_KEY}" -a -n "${RENDER_SERVICE_ID}"
+          curl --request POST \
+          --url https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys \
+          --header 'accept: application/json' \
+          --header "authorization: Bearer ${RENDER_API_KEY}" \
+          --header 'content-type: application/json' \
+          --data '{"clearCache": "clear"}'

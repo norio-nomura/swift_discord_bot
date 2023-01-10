@@ -1,4 +1,4 @@
-name: Update Render
+name: Update Branches
 
 on:
   pull_request:
@@ -9,21 +9,21 @@ on:
   workflow_dispatch:
     inputs:
       force-update:
-        description: Specify id or `all` to force updating render
+        description: Specify id or `all` to force updating branches
         required: false
 
 jobs:
-  update_render:
+  update_branches:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        id: ["4.0", "4.1", "4.2", "5.0", "5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "5.8", "nightly"]
+        id: ["4.0", "4.1", "4.2", "5.0", "5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "5.8", "main"]
         include:
           - id: '5.8'
             swift_webroot: 'https://download.swift.org/swift-5.8-branch/ubuntu2204'
-          - id: 'nightly'
+          - id: 'main'
             swift_webroot: 'https://download.swift.org/development/ubuntu2204'
 
     steps:
@@ -76,31 +76,13 @@ jobs:
           echo "steps.check-snapshot.outputs.timestamp: ${{ steps.check-snapshot.outputs.timestamp }}"
           false
 
-      - name: Build Render Secret Name
-        id: render-secret-name
-        env:
-          ID: ${{ matrix.id }}
-        run: |
-          echo "api_key=RENDER_API_KEY_${ID/.}" >> $GITHUB_OUTPUT
-          echo "service_id=RENDER_SERVICE_ID_${ID/.}" >> $GITHUB_OUTPUT
-
-      - name: Trigger Deploy And Force Push Commit
+      - name: Force Push Commit
         if: >
           contains(inputs.force-update, 'all') ||
           contains(inputs.force-update, matrix.id)  ||
           steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp ||
           steps.check-commit.outputs.timestamp < steps.check-snapshot.outputs.timestamp
-        env:
-          RENDER_API_KEY: ${{ secrets[steps.render-secret-name.outputs.api_key] }}
-          RENDER_SERVICE_ID: ${{ secrets[steps.render-secret-name.outputs.service_id] }}
         run: |
-          test -n "${RENDER_API_KEY}" -a -n "${RENDER_SERVICE_ID}"
-          curl --request POST \
-          --url https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys \
-          --header 'accept: application/json' \
-          --header "authorization: Bearer ${RENDER_API_KEY}" \
-          --header 'content-type: application/json' \
-          --data '{"clearCache": "clear"}'
           git config user.name github-actions
           git config user.email github-actions@github.com
           git commit --amend --no-edit
