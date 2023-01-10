@@ -31,6 +31,7 @@ jobs:
         with:
           fetch-depth: 0 # Using default '1' causes creating detached branch on Forrce Push Commit.
           ref: swift/${{ matrix.id }}
+          token: ${{ secrets.TOKEN_TO_TRIGGER_PUSH_EVENTS }}
 
       - name: Check Commit
         if: ${{ !inputs.force-update }}
