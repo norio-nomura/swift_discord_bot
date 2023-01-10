@@ -5,8 +5,9 @@ FROM ubuntu:22.04
 # LABEL maintainer="Swift Infrastructure <swift-infrastructure@forums.swift.org>"
 # LABEL description="Docker Container for the Swift programming language"
 
-RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && apt-get -q update && \
-    apt-get -q install -y \
+RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
+    export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && apt-get update -qq && \
+    apt-get install -qq \
     binutils \
     git \
     gnupg2 \
@@ -22,7 +23,7 @@ RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && ap
     pkg-config \
     tzdata \
     zlib1g-dev \
-    && rm -r /var/lib/apt/lists/*
+    > /dev/null
 
 # Everything up to here should cache nicely between Swift versions, assuming dev dependencies change little
 
@@ -45,10 +46,11 @@ ENV SWIFT_SIGNING_KEY=$SWIFT_SIGNING_KEY \
 
 RUN echo "${SWIFT_WEBROOT}/latest-build.yml"
 
-RUN set -e; \
+RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
+    set -e; \
     # - Grab curl here so we cache better up above
     export DEBIAN_FRONTEND=noninteractive \
-    && apt-get -q update && apt-get -q install -y curl && rm -rf /var/lib/apt/lists/* \
+    && apt-get update -qq && apt-get install -qq curl > /dev/null \
     # - Latest Toolchain info
     && export $(curl -s ${SWIFT_WEBROOT}/latest-build.yml | grep 'download:' | sed 's/:[^:\/\/]/=/g')  \
     && export $(curl -s ${SWIFT_WEBROOT}/latest-build.yml | grep 'download_signature:' | sed 's/:[^:\/\/]/=/g')  \
@@ -56,18 +58,18 @@ RUN set -e; \
     && echo $DOWNLOAD_DIR > .swift_tag \
     # - Download the GPG keys, Swift toolchain, and toolchain signature, and verify.
     && export GNUPGHOME="$(mktemp -d)" \
-    && curl -fsSL ${SWIFT_WEBROOT}/${DOWNLOAD_DIR}/${download} -o latest_toolchain.tar.gz \
+    && curl -fLsS ${SWIFT_WEBROOT}/${DOWNLOAD_DIR}/${download} -o latest_toolchain.tar.gz \
     ${SWIFT_WEBROOT}/${DOWNLOAD_DIR}/${download_signature} -o latest_toolchain.tar.gz.sig \
-    && curl -fSsL https://swift.org/keys/all-keys.asc | gpg --import -  \
-    && gpg --batch --verify latest_toolchain.tar.gz.sig latest_toolchain.tar.gz \
+    && curl -fLsS https://swift.org/keys/all-keys.asc | gpg --import --quiet - > /dev/null  \
+    && gpg --batch --quiet --verify latest_toolchain.tar.gz.sig latest_toolchain.tar.gz > /dev/null \
     # - Unpack the toolchain, set libs permissions, and clean up.
     && tar -xzf latest_toolchain.tar.gz --directory / --strip-components=1 \
     && chmod -R o+r /usr/lib/swift \
     && rm -rf "$GNUPGHOME" latest_toolchain.tar.gz.sig latest_toolchain.tar.gz \
-    && apt-get purge --auto-remove -y curl
+    && apt-get purge --auto-remove -qq curl > /dev/null
 
 # Print Installed Swift Version
-RUN swift --version
+RUN swift --version && cat .swift_tag
 
 RUN echo '[ ! -z "$TERM" -a -r /etc/motd ] && cat /etc/motd' \
     >> /etc/bash.bashrc; \
@@ -82,11 +84,13 @@ RUN echo '[ ! -z "$TERM" -a -r /etc/motd ] && cat /etc/motd' \
 
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
     export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && \
-    apt-get -q update && apt-get -q install -y ca-certificates curl llvm unzip && \
-    curl -fsSL https://deno.land/x/install/install.sh | DENO_INSTALL=/usr/local sh && \
-    curl -L https://github.com/cli/cli/releases/download/v2.5.0/gh_2.5.0_linux_amd64.tar.gz | tar zxf - --directory /usr --strip-components=1 && \
-    apt-get purge --auto-remove -y curl unzip && \
+    apt-get update -qq && apt-get install -qq ca-certificates curl llvm unzip > /dev/null && \
+    curl -fLsS https://deno.land/x/install/install.sh | DENO_INSTALL=/usr/local sh > /dev/null && \
+    curl -fLsS https://github.com/cli/cli/releases/download/v2.5.0/gh_2.5.0_linux_amd64.tar.gz | tar zxf - --directory /usr --strip-components=1 && \
+    apt-get purge --auto-remove -qq curl unzip > /dev/null && \
     useradd -m bot
+
+RUN deno --version
 
 # Install Bot
 WORKDIR /bot
@@ -94,7 +98,7 @@ WORKDIR /bot
 # Cache Dependencies
 COPY deps.ts .
 USER bot
-RUN deno cache ./deps.ts
+RUN deno cache -q ./deps.ts
 
 # Install remains
 COPY bot.ts entrypoint.sh ./
