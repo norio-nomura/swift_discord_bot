@@ -9,9 +9,7 @@ on:
 jobs:
   deploy_render:
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ github.ref_name }}
-      url: https://dashboard.render.com/web/${{ vars.RENDER_SERVICE_ID }}/deploys/${{ steps.trigger-deploy.outputs.id }}
+    environment: ${{ github.ref_name }}
     steps:
       - name: Trigger Deploy
         id: trigger-deploy
