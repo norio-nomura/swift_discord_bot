@@ -13,22 +13,8 @@ jobs:
       name: ${{ github.ref_name }}
       url: https://dashboard.render.com/web/${{ vars.RENDER_SERVICE_ID }}/deploys/${{ steps.trigger-deploy.outputs.id }}
     steps:
-      - name: Migrate secrets.RENDER_SERVICE_ID to vars.RENDER_SERVICE_ID
-        if: ${{ !vars.RENDER_SERVICE_ID }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN_TO_TRIGGER_PUSH_EVENTS }}
-        run: |
-          export ENVIRONMENT_NAME=$(python -c 'from urllib.parse import quote_plus;print(quote_plus("${{ github.ref_name }}"))')
-          gh api \
-          --method POST \
-          -H "Accept: application/vnd.github+json" \
-          /repositories/${{ github.repository_id }}/environments/${ENVIRONMENT_NAME}/variables \
-          -f name='RENDER_SERVICE_ID' \
-          -f value='${{ secrets.RENDER_SERVICE_ID }}' 
-
       - name: Trigger Deploy
         id: trigger-deploy
-        if: ${{ vars.RENDER_SERVICE_ID }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
