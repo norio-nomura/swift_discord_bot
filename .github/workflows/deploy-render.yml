@@ -4,16 +4,34 @@ on:
   push:
     branches:
       - 'swift/**'
+  workflow_dispatch:
 
 jobs:
   deploy_render:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name }}
+    environment:
+      name: ${{ github.ref_name }}
+      url: https://dashboard.render.com/web/${{ vars.RENDER_SERVICE_ID }}/deploys/${{ steps.trigger-deploy.outputs.id }}
     steps:
+      - name: Migrate secrets.RENDER_SERVICE_ID to vars.RENDER_SERVICE_ID
+        if: ${{ !vars.RENDER_SERVICE_ID }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN_TO_TRIGGER_PUSH_EVENTS }}
+        run: |
+          ENVIRONMENT_NAME=$(python -c 'import urllib;print urllib.quote_plus("${{ github.ref_name }}")') \
+          gh api \
+          --method POST \
+          -H "Accept: application/vnd.github+json" \
+          /repositories/${{ github.repository_id }}/environments/${ENVIRONMENT_NAME}/variables \
+          -f name='RENDER_SERVICE_ID' \
+          -f value='${{ secrets.RENDER_SERVICE_ID }}' 
+
       - name: Trigger Deploy
+        id: trigger-deploy
+        if: ${{ vars.RENDER_SERVICE_ID }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
         run: |
           test -n "${RENDER_API_KEY}" -a -n "${RENDER_SERVICE_ID}"
           curl --request POST \
@@ -21,4 +39,4 @@ jobs:
           --header 'accept: application/json' \
           --header "authorization: Bearer ${RENDER_API_KEY}" \
           --header 'content-type: application/json' \
-          --data '{"clearCache": "clear"}'
+          --data '{"clearCache": "clear"}'|jq -r '["id",.id]|join("=")' >> $GITHUB_OUTPUT
