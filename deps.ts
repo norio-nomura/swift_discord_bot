@@ -1,1 +1,1 @@
-export * from "https://raw.githubusercontent.com/norio-nomura/cli_discord_bot/main/mod.ts";
+export * from "https://raw.githubusercontent.com/norio-nomura/cli_discord_bot/use-uploading-files/mod.ts";
