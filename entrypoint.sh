@@ -1,5 +1,7 @@
 #!/bin/sh
 
+echo "RENDER_INSTANCE_ID: ${RENDER_INSTANCE_ID}"
+
 nickname() {
     local swift_version_output
     swift_version_output=$(swift -version 2>/dev/null) || return
