@@ -37,6 +37,8 @@ exec env -i PATH=${PATH} PORT=${PORT} DENO_TLS_CA_STORE=system deno run \
     --allow-env=PATH,PORT \
     --allow-net \
     --allow-run=/usr/bin/env \
+    --allow-read=${TMPDIR:-/tmp} \
+    --allow-write=${TMPDIR:-/tmp} \
     --quiet \
     bot.ts <<EOF
 $(deno run -A https://raw.githubusercontent.com/norio-nomura/cli_discord_bot/use-uploading-files/printOptionsFromEnv.ts)
