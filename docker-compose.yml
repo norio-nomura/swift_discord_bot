@@ -10,11 +10,14 @@ services:
         SWIFT_WEBROOT: ${SWIFT_WEBROOT:-https://download.swift.org/development}
     
     environment:
+      - ATTACHMENT_EXTENSION_TO_TREAT_AS_INPUT=.swift
       - DISCORD_NICKNAME
       - DISCORD_PLAYING
       # - DISCORD_TOKEN # should be provided by .env
       - ENV_ARGS
       - ENV_COMMAND
+      - NUMBER_OF_LINES_TO_EMBED_OUTPUT
+      - NUMBER_OF_LINES_TO_EMBED_UPLOADED_OUTPUT
       # - GITHUB_TOKEN # should be provided by .env
       - PORT=8081
       - TARGET_ARGS_TO_USE_STDIN
