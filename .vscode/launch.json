@@ -1,0 +1,30 @@
+{
+  // IntelliSense を使用して利用可能な属性を学べます。
+  // 既存の属性の説明をホバーして表示します。
+  // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Bot",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "bash",
+      "linux": {
+        "runtimeArgs": [
+          "-c",
+          "sudo -u debug --preserve-env=DISCORD_TOKEN,GITHUB_TOKEN ${workspaceFolder}/entrypoint.sh --inspect-wait"
+        ],
+        "attachSimplePort": 9229,
+        "console": "integratedTerminal",
+        "envFile": "${workspaceFolder}/dot.env",
+      },
+      "osx": {
+        "runtimeArgs": [
+          "-c",
+          "echo 'Debug Bot' requires container! >&2; exit 1"
+        ],
+        "internalConsoleOptions": "openOnSessionStart"
+      },
+    }
+  ]
+}

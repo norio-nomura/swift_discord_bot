@@ -1,0 +1,7 @@
+version: '3'
+services:
+  observant:
+    build:
+      context: .devcontainer
+    volumes:
+      - .:/workspaces/swift_discord_bot
