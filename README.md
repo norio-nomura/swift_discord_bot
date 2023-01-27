@@ -82,27 +82,6 @@ export GITHUB_TOKEN="<github token here>"   # github token, should be provided b
 docker compose up
 ```
 
-### Deploy to Heroku
-
-#### Deploy to Heroku Button
-
-You need editing `heroku.yml` to change `DOCKER_IMAGE` before clicking deploy
-button.<br/>
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
-
-#### Deploy Swift 5.4 Compiler Bot in CLI:
-
-```terminal.sh-session
-git clone https://github.com/norio-nomura/cli_discord_bot.git
-cd cli_discord_bot
-heroku container:login
-heroku create
-heroku config:set DISCORD_TOKEN="<discord token here>" GITHUB_TOKEN="<github token here>"
-heroku container:push worker --arg DOCKER_IMAGE=swift:5.4
-```
-
-Configure Dyno on your [Heroku Dashboard](https://dashboard.heroku.com/apps)
-
 ## Author
 
 Norio Nomura
