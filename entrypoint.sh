@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 echo "RENDER_INSTANCE_ID: ${RENDER_INSTANCE_ID}"
 
@@ -32,14 +32,20 @@ test -z "${DISCORD_PLAYING}" && unset DISCORD_PLAYING
 export TARGET_CLI=${TARGET_CLI:-swift}
 export TARGET_ARGS_TO_USE_STDIN=-
 
+vars=()
+for v in DENO_TLS_CA_STORE HTTP_PROXY HTTPS_PROXY PATH PORT; do
+    vars=("${vars[@]}" "${!v+${v}=${!v}}")
+done
+
 # Avoid passing options via environment variables or comandline arguments
-exec env -i PATH=${PATH} PORT=${PORT} DENO_TLS_CA_STORE=system deno run \
+exec env -i ${vars[@]} deno run \
     --allow-env=PATH,PORT \
     --allow-net \
     --allow-run=/usr/bin/env \
     --allow-read=${TMPDIR:-/tmp} \
     --allow-write=${TMPDIR:-/tmp} \
     --quiet \
+    "$@" \
     bot.ts <<EOF
-$(deno run -A https://raw.githubusercontent.com/norio-nomura/cli_discord_bot/main/printOptionsFromEnv.ts)
+$(deno eval 'import { printOptionsFromEnv } from "./deps.ts"; printOptionsFromEnv();')
 EOF

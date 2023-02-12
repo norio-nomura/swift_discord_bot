@@ -1,32 +1,27 @@
 version: '3'
 services:
   observant:
-    user: bot
     build:
       context: .
-      dockerfile: ${DOCKER_FILE:-Dockerfile}
       args:
         DOCKER_IMAGE: ${DOCKER_IMAGE:-swift:latest}
         SWIFT_WEBROOT: ${SWIFT_WEBROOT:-https://download.swift.org/development}
-    
     environment:
       - ATTACHMENT_EXTENSION_TO_TREAT_AS_INPUT=.swift
       - DISCORD_NICKNAME
       - DISCORD_PLAYING
-      # - DISCORD_TOKEN # should be provided by .env
+      - DISCORD_TOKEN
       - ENV_ARGS
       - ENV_COMMAND
+      - GITHUB_TOKEN
       - NUMBER_OF_LINES_TO_EMBED_OUTPUT
       - NUMBER_OF_LINES_TO_EMBED_UPLOADED_OUTPUT
-      # - GITHUB_TOKEN # should be provided by .env
       - PORT=8081
       - TARGET_ARGS_TO_USE_STDIN
       - TARGET_CLI
       - TARGET_DEFAULT_ARGS
       - TIMEOUT_ARGS
       - TIMEOUT_COMMAND
-
-    env_file: .env
     tty: true
     ports:
       - "8081:8081"

@@ -23,8 +23,8 @@ This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com
 
 3. Run bot on local host using `docker compose`
    ```terminal.sh-session
-   export DISCORD_TOKEN="<discord token here>" # discord token, should be provided by `.env`
-   export GITHUB_TOKEN="<github token here>"   # github token, should be provided by `.env`
+   export DISCORD_TOKEN="<discord token here>" # discord token
+   export GITHUB_TOKEN="<github token here>"   # github token
    docker compose up
    ```
 
@@ -46,7 +46,7 @@ This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com
 
 | Variable Name  | Description                                | default                     |
 | -------------- | ------------------------------------------ | --------------------------- |
-| `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:latest                |
+| `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:jammy                 |
 
 #### Using swift-DEVELOPMENT-SNAPSHOTS-* tarball
 
@@ -76,9 +76,9 @@ This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com
 #### swift 5.4 compiler bot:
 
 ```terminal.sh-session
-export DISCORD_TOKEN="<discord token here>" # discord token, should be provided by `.env`
+export DISCORD_TOKEN="<discord token here>" # discord token
 export DOCKER_IMAGE=swift:5.4               # docker image
-export GITHUB_TOKEN="<github token here>"   # github token, should be provided by `.env`
+export GITHUB_TOKEN="<github token here>"   # github token
 docker compose up
 ```
 
