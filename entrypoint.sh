@@ -47,5 +47,5 @@ exec env -i ${vars[@]} deno run \
     --quiet \
     "$@" \
     bot.ts <<EOF
-$(deno run -A https://raw.githubusercontent.com/norio-nomura/cli_discord_bot/main/printOptionsFromEnv.ts)
+$(deno eval 'import { printOptionsFromEnv } from "./deps.ts"; printOptionsFromEnv();')
 EOF
