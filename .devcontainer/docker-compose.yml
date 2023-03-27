@@ -3,5 +3,6 @@ services:
   observant:
     build:
       context: .devcontainer
+      dockerfile: ${DOCKER_FILE:-Dockerfile}
     volumes:
       - .:/workspaces/swift_discord_bot
