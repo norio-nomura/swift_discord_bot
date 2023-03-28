@@ -19,7 +19,7 @@ This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com
 2. Invite Bot to Your Guild
 
    Open following URL with changing `<Client ID>` to your bot's Client ID:
-   `https://discord.com/api/oauth2/authorize?client_id=<Client ID>&scope=bot&permissions=67174400`
+   `https://discord.com/api/oauth2/authorize?client_id=<Client ID>&scope=bot&permissions=67175424`
 
 3. Run bot on local host using `docker compose`
    ```terminal.sh-session
