@@ -4,7 +4,7 @@ services:
     env: docker
     region: ohio
     plan: free
-    dockerfilePath: ./Dockerfile.nightly
+    dockerfilePath: ./Dockerfile
     healthCheckPath: /
     envVars:
       - key: DISCORD_NICKNAME
@@ -14,9 +14,9 @@ services:
       - key: DISCORD_TOKEN
         sync: false
       - key: DOCKER_IMAGE
-        sync: false
+        value: swift:5.9
       - key: GITHUB_TOKEN
         sync: false
       - key: SWIFT_WEBROOT
-        value: https://download.swift.org/swift-5.9-branch
-    autoDeploy: false 
+        sync: false
+    autoDeploy: false
