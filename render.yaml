@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: swift_discord_bot
+    name: swift60-discord-bot
     env: docker
+    region: ohio
     plan: free
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./Dockerfile.nightly
     healthCheckPath: /
     envVars:
       - key: DISCORD_NICKNAME
@@ -17,5 +18,5 @@ services:
       - key: GITHUB_TOKEN
         sync: false
       - key: SWIFT_WEBROOT
-        sync: false
-    autoDeploy: false
+        value: https://download.swift.org/swift-6.0-branch
+    autoDeploy: false 
