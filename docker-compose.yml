@@ -2,11 +2,11 @@ services:
   observant:
     build:
       args:
-        BUILD_WASMKIT: false
-        DOCKER_IMAGE: swift
-        SWIFT_WEBROOT: https://download.swift.org/development
+        BUILD_WASMKIT: true
+        DOCKER_IMAGE: swift:6.0
+        SWIFT_WEBROOT: https://download.swift.org/swift-6.0-branch
         USE_SNAPSHOT: false
-        USE_SWIFT_SDKS: true
+        USE_SWIFT_SDKS: false
       platforms:
         - linux/amd64
         - linux/arm64
