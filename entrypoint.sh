@@ -40,6 +40,7 @@ done
 # Avoid passing options via environment variables or comandline arguments
 exec env -i ${vars[@]} deno run \
     --allow-env=PATH,PORT \
+    --allow-import=deno.land:443,raw.githubusercontent.com:443,unpkg.com:443 \
     --allow-net \
     --allow-run=/usr/bin/env \
     --allow-read=${TMPDIR:-/tmp} \

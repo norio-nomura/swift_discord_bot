@@ -20,7 +20,7 @@ WORKDIR /bot
 
 # Cache Dependencies
 COPY deps.ts ./
-RUN deno cache --quiet ./deps.ts
+RUN deno cache --allow-import=deno.land:443,raw.githubusercontent.com:443,unpkg.com:443 --quiet ./deps.ts
 
 # Install remains
 COPY bot.ts entrypoint.sh ./
