@@ -96,7 +96,7 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,t
     apt-get update -qq && apt-get install -qq \
     ca-certificates curl llvm unzip > /dev/null && \
     curl -fLsS https://deno.land/x/install/install.sh | DENO_INSTALL=/usr/local sh > /dev/null && \
-    curl -fLsS https://github.com/cli/cli/releases/download/v2.5.0/gh_2.5.0_linux_amd64.tar.gz | tar zxf - --directory /usr --strip-components=1 && \
+    curl -fLsS https://github.com/cli/cli/releases/download/v2.60.1/gh_2.60.1_linux_amd64.tar.gz | tar zxf - --directory /usr --strip-components=1 && \
     apt-get purge --auto-remove -qq curl unzip > /dev/null && \
     mkdir -p /etc/skel/.cache/deno && \
     useradd -m $USERNAME
