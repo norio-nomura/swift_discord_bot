@@ -2,7 +2,7 @@ services:
   observant:
     build:
       args:
-        DOCKER_IMAGE: swift
+        DOCKER_IMAGE: swift:6.1
         # SWIFT_WEBROOT: https://download.swift.org/development
       context: .
       dockerfile: Dockerfile
