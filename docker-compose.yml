@@ -5,6 +5,10 @@ services:
       dockerfile: ${DOCKER_FILE:-Dockerfile}
       args:
         DOCKER_IMAGE: ${DOCKER_IMAGE:-swift:latest}
+        SWIFT_SDK_DARWIN_CHECKSUM: f25dbeb34c62f55400724724efd030337357063758f9c003b7b06d0b5ec216d7
+        SWIFT_SDK_DARWIN_URL: https://github.com/kabiroberai/swift-sdk-darwin/releases/download/1.3.1/darwin-linux-x86_64.artifactbundle.zip
+        SWIFT_SDK_WASM_CHECKSUM: 6ffedb055cb9956395d9f435d03d53ebe9f6a8d45106b979d1b7f53358e1dcb4
+        SWIFT_SDK_WASM_URL: https://github.com/swiftwasm/swift/releases/download/swift-wasm-6.0.2-RELEASE/swift-wasm-6.0.2-RELEASE-wasm32-unknown-wasi.artifactbundle.zip
         SWIFT_WEBROOT: ${SWIFT_WEBROOT:-https://download.swift.org/development}
     environment:
       - ATTACHMENT_EXTENSION_TO_TREAT_AS_INPUT=.swift
@@ -20,7 +24,7 @@ services:
       - TARGET_ARGS_TO_USE_STDIN
       - TARGET_CLI
       - TARGET_DEFAULT_ARGS
-      - TIMEOUT_ARGS
+      - TIMEOUT_ARGS=--signal=KILL 120
       - TIMEOUT_COMMAND
     tty: true
     ports:
