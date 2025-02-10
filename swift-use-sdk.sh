@@ -14,6 +14,8 @@ else
     deployment_target=""
 fi
 
+executable=swift
+
 case "${target_sys}" in
     ios|iphone)
         swift_sdk_name=darwin
@@ -43,6 +45,7 @@ case "${target_sys}" in
         sdk_triple="wasm32-unknown-wasi"
         swift_sdk_name=$(swift sdk list|grep -E "${sdk_triple}") || exit
         target_triple="${sdk_triple}"
+        executable=swiftc
         ;;
     *)
         echo "Unknown target: ${target_sys}" >&2
@@ -50,11 +53,11 @@ case "${target_sys}" in
         ;;
 esac
 
-configuration=$(swift sdk configure --show-configuration "${swift_sdk_name}" "${sdk_triple}") || exit
+configuration=$(swift sdk configure --show-configuration "${swift_sdk_name}" "${sdk_triple}" | yq -o=json) || exit
 
 # Detect deployment target from SDKSettings.json if swift_sdk_name is darwin
 if [[ "${swift_sdk_name}" == "darwin" && -z "${deployment_target}" ]]; then
-    sdk_root_path=$(yq -r '.sdkRootPath' <<< "${configuration}")
+    sdk_root_path=$(jq -r '.sdkRootPath' <<< "${configuration}")
     sdk_settings="${sdk_root_path}/SDKSettings.json"
     if [[ -f "${sdk_settings}" ]]; then
         deployment_target=$(jq -r '.SupportedTargets.'"${darwin_target}"'.DefaultDeploymentTarget' "${sdk_settings}")
@@ -63,18 +66,18 @@ fi
 target_triple=${target_triple//\{deployment_target\}/${deployment_target}}
 SWIFT_ARGS_FOR_SDK=(-target "${target_triple}")
 
-# Build SWIFT_ARGS_FOR_SDK from configuration by yq and jq
-yq_output=$(
-    yq -r '
-        .includeSearchPaths[]|("-I",.)
+# Build SWIFT_ARGS_FOR_SDK from configuration by jq
+jq_output=$(
+    jq -r '
+        if .includeSearchPaths|type == "array" then (.includeSearchPaths[]|("-I",.)) else empty end
         , "-resource-dir",.swiftResourcesPath
         , "-sdk",.sdkRootPath
         , "-Xcc","-isysroot","-Xcc",.sdkRootPath
     ' <<< "${configuration}"
 ) || exit
-while IFS= read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${yq_output}"
+while IFS= read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${jq_output}"
 jq_output=$(
-    for toolsetPath in $(yq e '.toolsetPaths[]' <<< "${configuration}") ; do
+    for toolsetPath in $(jq -r '.toolsetPaths[]' <<< "${configuration}") ; do
         jq -r '
             ("'"$(dirname "${toolsetPath}")"'/" + .rootPath) as $rootPath
             | if .linker?.path then "-ld-path=" + $rootPath + "/" + .linker.path else empty end
@@ -89,4 +92,4 @@ jq_output=$(
 while IFS= read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${jq_output}"
 
 echo "Target: ${target_triple}" >&2
-exec swift "${SWIFT_ARGS_FOR_SDK[@]}" "$@"
+exec "${executable}" "${SWIFT_ARGS_FOR_SDK[@]}" "$@"
