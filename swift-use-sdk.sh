@@ -5,7 +5,7 @@ arch=$(arch)
 arch=${arch/aarch64/arm64}
 target_sys=${0/*\/swift-/}
 if [[ ${1} == "--list-targets" ]]; then
-    echo ios iphone ios-simulator iphonesimulator macos ios-macabi iosmac mac-catalyst wasi wasip1 wasm wasm32
+    echo ios iphone ios-simulator iphonesimulator macos ios-macabi iosmac mac-catalyst wasi wasip1 wasm wasm32 musl static
     exit
 elif [[ "${1}" =~ [0-9]+\.[0-9]+ ]]; then
     deployment_target="${1}"
@@ -46,6 +46,11 @@ case "${target_sys}" in
         swift_sdk_name=$(swift sdk list|grep -E "${sdk_triple}") || exit
         target_triple="${sdk_triple}"
         executable=swiftc
+        ;;
+    musl|static)
+        swift_sdk_name=$(swift sdk list|grep -E "_static-linux") || exit
+        sdk_triple="$(arch)-swift-linux-musl"
+        target_triple="${sdk_triple}"
         ;;
     *)
         echo "Unknown target: ${target_sys}" >&2
