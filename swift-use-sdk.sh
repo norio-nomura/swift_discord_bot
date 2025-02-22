@@ -75,6 +75,8 @@ SWIFT_ARGS_FOR_SDK=(-target "${target_triple}")
 jq_output=$(
     jq -r '
         if .includeSearchPaths|type == "array" then (.includeSearchPaths[]|("-I",.)) else empty end
+        , if .librarySearchPaths|type == "array" then (.librarySearchPaths[]|("-L",.)) else empty end
+        , if .swiftStaticResourcesPath|type == "string" then ("-resource-dir",.swiftStaticResourcesPath+"/clang"|("-Xclang-linker",.)) else empty end
         , "-resource-dir",.swiftResourcesPath
         , "-sdk",.sdkRootPath
         , "-Xcc","-isysroot","-Xcc",.sdkRootPath
