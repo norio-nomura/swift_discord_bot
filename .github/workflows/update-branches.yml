@@ -77,14 +77,30 @@ jobs:
           echo "steps.check-snapshot.outputs.timestamp: ${{ steps.check-snapshot.outputs.timestamp }}"
           false
 
+      - name: Update Swift SDKs
+        id: update-swift-sdks
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [[ -x ./update-swift-sdks.sh ]] || exit 0 # Some branches may not have the script
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          ./update-swift-sdks.sh
+          git add docker-compose.yml render.yaml
+          if ! git diff --cached --quiet; then
+            commit_message="Update Swift SDKs"
+            last_commit_subject=$(git log -1 --pretty=%s)
+            [[ "$commit_message" == "$last_commit_subject" ]] || git commit -m "$commit_message"
+            echo "updated=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Force Push Commit
         if: >
           contains(inputs.force-update, 'all') ||
           contains(inputs.force-update, matrix.id)  ||
           steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp ||
-          steps.check-commit.outputs.timestamp < steps.check-snapshot.outputs.timestamp
+          steps.check-commit.outputs.timestamp < steps.check-snapshot.outputs.timestamp ||
+          steps.update-swift-sdks.outputs.updated == 'true'
         run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
           git commit --amend --no-edit
           git push --force
