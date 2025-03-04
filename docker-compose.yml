@@ -2,6 +2,9 @@ services:
   observant:
     build:
       args:
+        SWIFT_SDKS: |-
+          cd1b0de0bcc809692e803a078800b9d577c0eefbd2b3d2cfd24e53f019ca5de3 https://download.swift.org/development/static-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-01-31-a/swift-DEVELOPMENT-SNAPSHOT-2025-01-31-a_static-linux-0.0.1.artifactbundle.tar.gz
+          b89e5090f34185b2a3a31c7e70d1090bbb68e95f36ebfa53a581184f862ced6e https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-03-25-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-03-25-a-wasm32-unknown-wasi.artifactbundle.zip
         # DOCKER_IMAGE: swift
         SWIFT_WEBROOT: https://download.swift.org/development
       context: .
