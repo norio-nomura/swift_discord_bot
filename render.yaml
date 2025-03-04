@@ -17,6 +17,10 @@ services:
         sync: false
       - key: GITHUB_TOKEN
         sync: false
+      - key: SWIFT_SDKS
+        value: |-
+          cd1b0de0bcc809692e803a078800b9d577c0eefbd2b3d2cfd24e53f019ca5de3 https://download.swift.org/development/static-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-01-31-a/swift-DEVELOPMENT-SNAPSHOT-2025-01-31-a_static-linux-0.0.1.artifactbundle.tar.gz
+          c2ab6d3360591d14af05e2bcfcc1ba970f2c3c6862e70b47f36075f846921287 https://github.com/swiftwasm/swift/releases/download/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-03-28-a/swift-wasm-DEVELOPMENT-SNAPSHOT-2025-03-28-a-wasm32-unknown-wasi.artifactbundle.zip
       - key: SWIFT_WEBROOT
         value: https://download.swift.org/development
     autoDeploy: false
