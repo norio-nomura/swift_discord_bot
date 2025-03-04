@@ -4,6 +4,9 @@ services:
       args:
         DOCKER_IMAGE: swift:6.0
         # SWIFT_WEBROOT: https://download.swift.org/development
+        SWIFT_SDKS: |-
+          67f765e0030e661a7450f7e4877cfe008db4f57f177d5a08a6e26fd661cdd0bd https://download.swift.org/swift-6.0.3-release/static-sdk/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz
+          80d63fc80b55091d69164cafcebcd8c48236da1e1a57af28da461bee3bcf0587 https://github.com/swiftwasm/swift/releases/download/swift-wasm-6.0-SNAPSHOT-2025-03-04-a/swift-wasm-6.0-SNAPSHOT-2025-03-04-a-wasm32-unknown-wasi.artifactbundle.zip
       context: .
       dockerfile: Dockerfile
       secrets:
