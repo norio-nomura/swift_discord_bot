@@ -17,6 +17,10 @@ services:
         value: swift:6.0
       - key: GITHUB_TOKEN
         sync: false
+      - key: SWIFT_SDKS
+        value: |-
+          67f765e0030e661a7450f7e4877cfe008db4f57f177d5a08a6e26fd661cdd0bd https://download.swift.org/swift-6.0.3-release/static-sdk/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz
+          622a3329794b4fb441ffaf5cbcc5ac1c8831be541684f52d2e256c3afc810783 https://github.com/swiftwasm/swift/releases/download/swift-wasm-6.0-SNAPSHOT-2025-04-04-a/swift-wasm-6.0-SNAPSHOT-2025-04-04-a-wasm32-unknown-wasi.artifactbundle.zip
       - key: SWIFT_WEBROOT
         sync: false
     autoDeploy: false
