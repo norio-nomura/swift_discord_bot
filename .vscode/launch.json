@@ -12,7 +12,7 @@
         "runtimeExecutable": "sudo",
         "runtimeArgs": [
           "-u",
-          "debug",
+          "bot",
           "--preserve-env=DISCORD_TOKEN,GITHUB_TOKEN,HTTP_PROXY,HTTPS_PROXY",
           "${workspaceFolder}/entrypoint.sh",
           "--cert=${workspaceFolder}/.devcontainer/charles-ssl-proxying-certificate.crt",

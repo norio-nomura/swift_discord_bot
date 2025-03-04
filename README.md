@@ -52,7 +52,6 @@ This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com
 
 | Variable Name   | Description                               | default                                |
 | --------------- | ----------------------------------------- | -------------------------------------- |
-| `DOCKER_FILE`   | Use `Dockerfile.nightly` for this feature | Dockerfile                             |
 | `SWIFT_WEBROOT` | Webroot getting Swift toolcahin tar ball  | https://download.swift.org/development |
 
 ### Environment variables for run time configurations

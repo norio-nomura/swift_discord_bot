@@ -13,12 +13,18 @@ done
 gh extension install norio-nomura/gh-query-tags 2>/dev/null
 
 function detect_swift_snapshot_version() {
-	local dockerfile="${1}" SWIFT_WEBROOT="${2}" SWIFT_PLATFORM OS_MAJOR_VER OS_MIN_VER OS_ARCH_SUFFIX arch latest_build_yml_url
+	local dockerfile="Dockerfile" SWIFT_WEBROOT="${1}" SWIFT_PLATFORM PLATFORM_CODENAME OS_MAJOR_VER OS_MIN_VER OS_ARCH_SUFFIX arch latest_build_yml_url
 
-	[[ ${SWIFT_WEBROOT} == "null" ]] && SWIFT_WEBROOT="$(sed -n -E 's/^ARG SWIFT_WEBROOT=(.*)$/\1/p' "${dockerfile}")"
 	SWIFT_PLATFORM="$(sed -n -E 's/^ARG SWIFT_PLATFORM=(.*)$/\1/p' "${dockerfile}")"
-	OS_MAJOR_VER="$(sed -n -E 's/^ARG OS_MAJOR_VER=(.*)$/\1/p' "${dockerfile}")"
-	OS_MIN_VER="$(sed -n -E 's/^ARG OS_MIN_VER=(.*)$/\1/p' "${dockerfile}")"
+	PLATFORM_CODENAME="$(sed -n -E 's/^ARG PLATFORM_CODENAME=(.*)$/\1/p' "${dockerfile}")"
+	OS_MAJOR_VER=${PLATFORM_CODENAME}
+	OS_MAJOR_VER=${OS_MAJOR_VER/focal/20}
+	OS_MAJOR_VER=${OS_MAJOR_VER/jammy/22}
+	OS_MAJOR_VER=${OS_MAJOR_VER/noble/24}
+	OS_MIN_VER=${PLATFORM_CODENAME}
+	OS_MIN_VER=${OS_MIN_VER/focal/04}
+	OS_MIN_VER=${OS_MIN_VER/jammy/04}
+	OS_MIN_VER=${OS_MIN_VER/noble/04}
 	arch="$(arch)"
 	case "${arch}" in
 	amd64 | x86_64) OS_ARCH_SUFFIX= ;;
@@ -45,21 +51,15 @@ function detect_swift_release_version() {
 }
 
 function detect_swift_version_from_render_yaml() {
-	local dockerfile render_yaml="${1}" SWIFT_WEBROOT
-	dockerfile=$(yq eval '.services[0]|.dockerfilePath' "${render_yaml}")
-	case "${dockerfile}" in
-	./Dockerfile.nightly) # swift-(\d+\.\d+-)?DEVELOPMENT-SNAPSHOT-\d+-\d+-\d+-a
-		SWIFT_WEBROOT="$(yq eval '.services[0]|.envVars|map(select(.key == "SWIFT_WEBROOT"))[0]|.value' "${render_yaml}")"
-		detect_swift_snapshot_version "${dockerfile}" "${SWIFT_WEBROOT}"
-		;;
-	./Dockerfile) # swift-\d+\.\d+(.\d+)?-RELEASE
+	local render_yaml="${1}" SWIFT_WEBROOT
+	SWIFT_WEBROOT="$(yq eval '.services[0]|.envVars|map(select(.key == "SWIFT_WEBROOT"))[0]|.value' "${render_yaml}")"
+	if [[ ${SWIFT_WEBROOT} != "null" ]]; then
+		# swift-(\d+\.\d+-)?DEVELOPMENT-SNAPSHOT-\d+-\d+-\d+-a
+		detect_swift_snapshot_version "${SWIFT_WEBROOT}"
+	else
+		# swift-\d+\.\d+(.\d+)?-RELEASE
 		detect_swift_release_version "${render_yaml}"
-		;;
-	*)
-		echo "Unexpected Dockerfile: ${dockerfile}" >&2
-		exit 1
-		;;
-	esac
+	fi
 }
 
 function swift_tag_patterns_from_swift_version() {

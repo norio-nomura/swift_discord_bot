@@ -15,11 +15,18 @@
 		},
 		{
 			"source": "deno-cache-for-debug",
-			"target": "/home/debug/.cache/deno",
+			"target": "/home/debugger/.cache/deno",
 			"type": "volume"
 		}
 	],
-	"extensions": [
-		"denoland.vscode-deno"
-	]
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"denoland.vscode-deno"
+			],
+			"settings": {
+				"deno.path": "/usr/local/bin/deno" // it must be full path
+			}
+		}
+	}
 }
