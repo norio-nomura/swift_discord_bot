@@ -26,7 +26,7 @@ ARG SWIFT_WEBROOT=https://download.swift.org/development
 # swift-sdks-downloader
 ####################################################################################################
 FROM ${PLATFORM_IMAGE} AS swift-sdks-downloader
-SHELL ["/bin/bash", "-eux", "-o", "pipefail", "-c"]
+SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
 
 # don't clean apt cache
 RUN cd /etc/apt/apt.conf.d; rm -f docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > keep-cache
@@ -47,7 +47,7 @@ EOF
 # use-pre-built-swift-image
 ####################################################################################################
 FROM ${DOCKER_IMAGE} AS use-pre-built-swift-image
-SHELL ["/bin/bash", "-eux", "-o", "pipefail", "-c"]
+SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
 
 # don't clean apt cache
 RUN cd /etc/apt/apt.conf.d; rm -f docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > keep-cache
@@ -59,7 +59,7 @@ RUN cd /etc/apt/apt.conf.d; rm -f docker-clean; echo 'Binary::apt::APT::Keep-Dow
 FROM ${PLATFORM_IMAGE} AS use-swift-snapshot-image-built-here
 # LABEL maintainer="Swift Infrastructure <swift-infrastructure@forums.swift.org>"
 # LABEL description="Docker Container for the Swift programming language"
-SHELL ["/bin/bash", "-eux", "-o", "pipefail", "-c"]
+SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
 
 # don't clean apt cache
 RUN cd /etc/apt/apt.conf.d; rm -f docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > keep-cache
