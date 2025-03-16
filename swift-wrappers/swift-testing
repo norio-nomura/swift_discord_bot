@@ -1,0 +1,62 @@
+#!/bin/bash -eu
+[[ -n ${DEBUG:-} ]] && set -x
+set -o pipefail
+
+# print the error message and exit with status 1
+function error_exit() {
+	echo "$(basename "${1}"): Error: ${*:2}" >&2
+	exit 1
+}
+
+commands=()
+while [[ ${1:-} == [^-]* ]]; do
+	commands+=("${1}")
+	shift
+done
+
+# becasue swift-testing requires an executable file to getting the test entry points, use swiftc
+[[ " ${commands[*]} " == *" swiftc "* ]] || commands+=("swiftc")
+
+code="$(cat)"
+# check "import Testing" is present in the code, if not prepend it
+grep -q "^import Testing$" <<<"${code}" || code=$(
+	cat <<-EOF
+		import Testing
+		${code}
+
+	EOF
+)
+
+# append "await Testing.__swiftPMEntryPoint() as Never" to the code
+entry_point_call="await Testing.__swiftPMEntryPoint() as Never"
+
+# check if -parse-as-library is present in the arguments, append that as @main struct Runner
+if [[ " $* " == *" -parse-as-library "* ]]; then
+	entry_point_call=$(
+		cat <<-EOF
+			@main struct Runner {
+				static func main() async {
+					${entry_point_call}
+				}
+			}
+		EOF
+	)
+	code="$(
+		cat <<-EOF
+			${code}
+			@main struct Runner {
+				static func main() async {
+					await Testing.__swiftPMEntryPoint() as Never
+				}
+			}
+		EOF
+	)"
+fi
+code="$(
+	cat <<-EOF
+		${code}
+		${entry_point_call}
+	EOF
+)"
+
+"swift-${commands[0]}" "${commands[@]:1}" "$@" <<<"${code}"

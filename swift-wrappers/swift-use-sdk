@@ -1,0 +1,83 @@
+#!/bin/bash -eu
+[[ -n ${DEBUG:-} ]] && set -x
+set -o pipefail
+
+# print the error message and exit with status 1
+function error_exit() {
+	echo "$(basename "${1}"): Error: ${*:2}" >&2
+	exit 1
+}
+
+arch=$(arch)
+arch=${arch/aarch64/arm64}
+target_sys=${0/*\/swift-/}
+if [[ ${1:-} == "--list-targets" ]]; then
+	echo ios iphone ios-simulator iphonesimulator macos ios-macabi iosmac mac-catalyst wasi wasip1 wasm wasm32 musl static
+	exit
+elif [[ ${1:-} =~ [0-9]+\.[0-9]+ ]]; then
+	darwin_deployment_target="${1}"
+	shift
+else
+	darwin_deployment_target=""
+fi
+
+commands=()
+while [[ ${1:-} == [^-]* ]]; do
+	commands+=("${1}")
+	shift
+done
+
+case "${target_sys}" in
+ios | iphone)
+	sdk_triple="${arch}-apple-ios"
+	target_triple="${arch}-apple-ios{darwin_deployment_target}"
+	;;
+ios-simulator | iphonesimulator)
+	sdk_triple="${arch}-apple-ios-simulator"
+	target_triple="${arch}-apple-ios{darwin_deployment_target}-simulator"
+	;;
+macos)
+	sdk_triple="${arch}-apple-macosx"
+	target_triple="${arch}-apple-macosx{darwin_deployment_target}"
+	;;
+ios-macabi | iosmac | mac-catalyst)
+	sdk_triple="${arch}-apple-macosx"
+	target_triple="${arch}-apple-ios{darwin_deployment_target}-macabi"
+	darwin_platform_name="iosmac"
+	;;
+wasi | wasip1 | wasm | wasm32)
+	sdk_triple="wasm32-unknown-wasi"
+	target_triple="${sdk_triple}"
+	# because swift does not support executing wasm, use swiftc
+	[[ " ${commands[*]} " == *" swiftc "* ]] || commands+=("swiftc")
+	;;
+musl | static)
+	sdk_triple="$(arch)-swift-linux-musl"
+	target_triple="${sdk_triple}"
+	;;
+*)
+	error_exit "${0}" "Unknown target: ${target_sys}"
+	;;
+esac
+
+SWIFT_ARGS_FOR_SDK=()
+SWIFT_ARGS_FOR_SDK=($(swift-args-for-sdk "${sdk_triple}" "$@"))
+
+# Detect deployment target from SDKSettings.json
+if [[ ${target_triple} == *"{darwin_deployment_target}"* ]]; then
+	[[ -z ${darwin_deployment_target} ]] && darwin_deployment_target=$(
+		swift-darwin-deployment-target "${sdk_triple}" "${darwin_platform_name:-}"
+	)
+	target_triple=${target_triple//\{darwin_deployment_target\}/${darwin_deployment_target}}
+fi
+
+SWIFT_ARGS_FOR_SDK=(-target "${target_triple}" "${SWIFT_ARGS_FOR_SDK[@]}")
+
+echo "Target: ${target_triple}" >&2
+
+set -- "${commands[@]}" "${SWIFT_ARGS_FOR_SDK[@]}" "$@"
+if [[ ${#commands[@]} -eq 0 ]]; then
+	swift "$@"
+else
+	"swift-${1}" "${@:2}"
+fi

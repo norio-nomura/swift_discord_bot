@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 0 # Using default '1' causes creating detached branch on Forrce Push Commit.
+          fetch-depth: 0  # Using default '1' causes creating detached branch on Forrce Push Commit.
           ref: swift/${{ matrix.id }}
           token: ${{ secrets.TOKEN_TO_TRIGGER_PUSH_EVENTS }}
 
@@ -66,8 +66,7 @@ jobs:
 
       - name: Verify Timestamps
         if: >
-          !inputs.force-update &&
-          (
+          !inputs.force-update && (
             steps.check-commit.outputs.timestamp == null ||
             (steps.check-image.outputs.timestamp == null && steps.check-snapshot.outputs.timestamp == null )
           )
@@ -96,11 +95,7 @@ jobs:
 
       - name: Force Push Commit
         if: >
-          contains(inputs.force-update, 'all') ||
-          contains(inputs.force-update, matrix.id)  ||
-          steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp ||
-          steps.check-commit.outputs.timestamp < steps.check-snapshot.outputs.timestamp ||
-          steps.update-swift-sdks.outputs.updated == 'true'
+          contains(inputs.force-update, 'all') || contains(inputs.force-update, matrix.id)  || steps.check-commit.outputs.timestamp < steps.check-image.outputs.timestamp || steps.check-commit.outputs.timestamp < steps.check-snapshot.outputs.timestamp || steps.update-swift-sdks.outputs.updated == 'true'
         run: |
           git commit --amend --no-edit
           git push --force

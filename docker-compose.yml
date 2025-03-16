@@ -1,11 +1,13 @@
 services:
   observant:
     build:
-      context: .
-      dockerfile: Dockerfile
       args:
         DOCKER_IMAGE: swift
         # SWIFT_WEBROOT: https://download.swift.org/development
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - github_token
       target: production
     environment:
       - ATTACHMENT_EXTENSION_TO_TREAT_AS_INPUT=.swift
@@ -26,3 +28,6 @@ services:
     tty: true
     ports:
       - "8081:8081"
+secrets:
+  github_token:
+    file: .github_token

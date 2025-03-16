@@ -1,0 +1,45 @@
+#!/bin/bash -eu
+[[ -n ${DEBUG:-} ]] && set -x
+set -o pipefail
+
+# print the error message and exit with status 1
+function error_exit() {
+	echo "$(basename "${1}"): Error: ${*:2}" >&2
+	exit 1
+}
+
+target_triple=${1:-}
+[[ -n ${target_triple} ]] || error_exit "${0}" "missing target_triple"
+
+sdk_configuration=$(swift-sdk-configuration "${target_triple}")
+
+# # Build SWIFT_ARGS_FOR_SDK from configuration by jq
+jq_output=$(
+	for toolsetPath in $(jq --raw-output '.toolsetPaths[]' <<<"${sdk_configuration}"); do
+		# shellcheck disable=SC2310
+		jq --raw-output --arg toolsetDir "$(dirname "${toolsetPath}")" '
+            "\($toolsetDir)/\(.rootPath // ".")" as $rootPath
+            | (.linker?.path|select(.)|"-ld-path=\($rootPath)/\(.)")
+            , ("-tools-directory",$rootPath|("-Xfrontend",.))
+            , (.swiftCompiler?.extraCLIOptions[]?)
+            , (.cCompiler?.extraCLIOptions[]?|("-Xcc",.))
+            , (.cxxCompiler?.extraCLIOptions[]?|("-Xcxx",.))
+            , (.linker?.extraCLIOptions[]?|("-Xlinker",.))
+        ' "${toolsetPath}" || error_exit "${0}" "Failed to parse ${toolsetPath}"
+	done
+) || error_exit "${0}" "Failed to parse toolsetPaths"
+while IFS= read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${jq_output}"
+
+[[ " ${SWIFT_ARGS_FOR_SDK[*]} " == *" -static-stdlib "* || " $* " == *" -static-stdlib "* ]] && resourcePathKey="swiftStaticResourcesPath" || resourcePathKey="swiftResourcesPath"
+
+jq_output=$(
+	jq --raw-output --arg resourcePathKey "${resourcePathKey}" '
+        (.includeSearchPaths[]?|("-I",.))
+        , (.librarySearchPaths[]?|("-L",.))
+        , (.sdkRootPath|select(.)|("-sdk",.),("-isysroot",.|("-Xclang-linker",.)))
+        , (.[$resourcePathKey]|select(.)|("-resource-dir","\(.)/clang"|("-Xclang-linker",.)),("-resource-dir",.))
+    ' <<<"${sdk_configuration}"
+) || error_exit "${0}" "Failed to parse SDK configuration"
+while IFS= read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${jq_output}"
+
+echo "${SWIFT_ARGS_FOR_SDK[@]}"

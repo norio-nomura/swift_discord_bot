@@ -1,0 +1,43 @@
+#!/bin/bash -eu
+[[ -n ${DEBUG:-} ]] && set -x
+set -o pipefail
+
+# print the error message and exit with status 1
+function error_exit() {
+	echo "$(basename "${1}"): Error: ${*:2}" >&2
+	exit 1
+}
+
+commands=()
+while [[ ${1:-} == [^-]* ]]; do
+	commands+=("${1}")
+	shift
+done
+
+# append exec to the commands array if it is not already present
+[[ " ${commands[*]} " == *" exec "* ]] || commands+=("exec")
+
+# split $@ by "--" and move the arguments before "--" to swiftc_flags
+swiftc_flags=("$@")
+set --
+for i in "${!swiftc_flags[@]}" ""; do
+	[[ -n ${i} &&  ${swiftc_flags[i]} == -- ]] && break
+done && {
+	set -- "${swiftc_flags[@]:i+1}"
+	swiftc_flags=("${swiftc_flags[@]:0:i}")
+}
+
+# if $@ contains "-", move "-" to swiftc_flags
+removing_hyphen=("$@")
+for i in "${!removing_hyphen[@]}" ""; do
+	[[ -n ${i} && ${removing_hyphen[i]} == "-" ]] && break
+done && {
+	swiftc_flags+=("-")
+	set -- "${removing_hyphen[@]:0:i}" "${removing_hyphen[@]:i+1}"
+}
+
+# execute swiftc with swiftc_flags
+swiftc "${swiftc_flags[@]}"
+
+# following commands are for the main executable file
+"swift-${commands[0]}" "${commands[@]:1}" "$@"

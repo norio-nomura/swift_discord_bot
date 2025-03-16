@@ -1,0 +1,7 @@
+extensions:
+  - yaml
+  - yml
+formatter:
+  indentless_arrays: false
+  pad_line_comments: 2
+  retain_line_breaks: true

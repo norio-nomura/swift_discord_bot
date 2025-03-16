@@ -1,0 +1,39 @@
+#!/bin/bash -eu
+[[ -n ${DEBUG:-} ]] && set -x
+set -o pipefail
+
+# print the error message and exit with status 1
+function error_exit() {
+	echo "$(basename "${1}"): Error: ${*:2}" >&2
+	exit 1
+}
+
+[[ -x main ]] || error_exit "${0}" "main is not an executable file"
+
+commands=()
+while [[ ${1:-} == [^-]* ]]; do
+	commands+=("${1}")
+	shift
+done
+
+file_info="$(file -b main)"
+set +e
+case "${file_info}" in
+ELF* | Mach-O*)
+	./main "$@"
+	status=$?
+	rm main
+	exit "${status}"
+	;;
+WebAssembly*)
+	[[ ${#commands[@]} -ne 0 ]] || commands=(wasmkit-cli)
+	"swift-${commands[0]}" "${commands[@]:1}" "$@"
+	status=$?
+	rm main
+	exit "${status}"
+	;;
+*)
+	echo "main is not an executable file: ${file_info}" >&2
+	exit 1
+	;;
+esac

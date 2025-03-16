@@ -1,0 +1,38 @@
+#!/bin/bash -eu
+[[ -n ${DEBUG:-} ]] && set -x
+set -o pipefail
+
+# print the error message and exit with status 1
+function error_exit() {
+	echo "$(basename "${1}"): Error: ${*:2}" >&2
+	exit 1
+}
+
+target_triple=${1:-}
+[[ -n ${target_triple} ]] || error_exit "${0}" "missing target_triple"
+
+swift_sdk_json_file_list=$(
+	shopt -s nullglob
+	jq --raw-output '
+        .artifacts|map_values(.variants|map("\(input_filename|rtrimstr("info.json"))\(.path)/swift-sdk.json"))[][]
+    ' ~/{.swiftpm,Library/org.swift.swiftpm}/swift-sdks/*/info.json
+)
+while IFS= read -r line; do [[ -n ${line} ]] && swift_sdk_json_files+=("${line}"); done <<<"${swift_sdk_json_file_list}"
+[[ -v swift_sdk_json_files ]] || error_exit "${0}" "sdk for ${target_triple} not found"
+
+target_triple_to_sdk_configuration_json=$(
+	jq '
+        .targetTriples|map_values(.root = (input_filename|rtrimstr("swift-sdk.json")))
+    ' "${swift_sdk_json_files[@]}" | jq --slurp --sort-keys 'reduce .[] as $item ({}; . + $item)'
+)
+sdk_configuration=$(
+	jq --exit-status --raw-output --arg target_triple "${target_triple}" '
+        .[$target_triple]
+        | .root as $root
+        | (.sdkRootPath,.swiftResourcesPath,.swiftStaticResourcesPath|select(type == "string")) |= $root + .
+        | (.includeSearchPaths,.librarySearchPaths,.toolsetPaths|select(type == "array")[]) |= $root + .
+        | del(.root)
+    ' <<<"${target_triple_to_sdk_configuration_json}"
+) || error_exit "${0}" "Failed to get configuration for ${target_triple}"
+
+echo "${sdk_configuration}"
