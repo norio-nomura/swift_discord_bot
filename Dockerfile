@@ -277,7 +277,7 @@ RUN mkdir -p /etc/skel/.cache/deno && useradd -m $USERNAME
 # Install SwiftSDKs on the bot user
 USER $USERNAME
 RUN --mount=type=bind,from=swift-sdks-downloader,source=/swift-sdks,target=/swift-sdks \
-    find /swift-sdks -type f | xargs -n 1 -r swift sdk install
+    find /swift-sdks -type f | xargs -n 1 -r swift sdk install || true
 
 # install tools
 USER root
