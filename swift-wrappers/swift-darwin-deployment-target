@@ -1,16 +1,8 @@
 #!/bin/bash -eu
-[[ -n ${DEBUG:-} ]] && set -x
-set -o pipefail
+. swift-bot-helper
 
-# print the error message and exit with status 1
-function error_exit() {
-	echo "$(basename "${1}"): Error: ${*:2}" >&2
-	exit 1
-}
-
-target_triple=${1:-}
+target_triple=${1:-} darwin_platform_name=${2:-}
 [[ -n ${target_triple} ]] || error_exit "${0}" "missing target_triple"
-darwin_platform_name=${2:-}
 
 sdk_configuration=$(swift-sdk-configuration "${target_triple}")
 

@@ -1,23 +1,19 @@
 #!/bin/bash -eu
-[[ -n ${DEBUG:-} ]] && set -x
-set -o pipefail
-
-# print the error message and exit with status 1
-function error_exit() {
-	echo "$(basename "${1}"): Error: ${*:2}" >&2
-	exit 1
-}
+. swift-bot-helper
 
 target_triple=${1:-}
-[[ -n ${target_triple} ]] || error_exit "${0}" "missing target_triple"
+# ignore target_triple if it is "-"
+[[ "${target_triple}" == "-" ]] && target_triple=""
 
 swift_sdk_json_file_list=$(
 	shopt -s nullglob
+	info_json_files=(~/{.swiftpm,Library/org.swift.swiftpm}/swift-sdks/*/info.json)
+	[[ -v info_json_files ]] || error_exit "${0}" "No swift-sdk info.json files found"
 	jq --raw-output '
         .artifacts|map_values(.variants|map("\(input_filename|rtrimstr("info.json"))\(.path)/swift-sdk.json"))[][]
     ' ~/{.swiftpm,Library/org.swift.swiftpm}/swift-sdks/*/info.json
 )
-while IFS= read -r line; do [[ -n ${line} ]] && swift_sdk_json_files+=("${line}"); done <<<"${swift_sdk_json_file_list}"
+mapfile -t swift_sdk_json_files <<<"${swift_sdk_json_file_list}"
 [[ -v swift_sdk_json_files ]] || error_exit "${0}" "sdk for ${target_triple} not found"
 
 target_triple_to_sdk_configuration_json=$(
@@ -27,11 +23,13 @@ target_triple_to_sdk_configuration_json=$(
 )
 sdk_configuration=$(
 	jq --exit-status --raw-output --arg target_triple "${target_triple}" '
-        .[$target_triple]
-        | .root as $root
-        | (.sdkRootPath,.swiftResourcesPath,.swiftStaticResourcesPath|select(type == "string")) |= $root + .
-        | (.includeSearchPaths,.librarySearchPaths,.toolsetPaths|select(type == "array")[]) |= $root + .
-        | del(.root)
+        map_values(
+            .root as $root
+            | (.sdkRootPath,.swiftResourcesPath,.swiftStaticResourcesPath|select(type == "string")) |= $root + .
+            | (.includeSearchPaths,.librarySearchPaths,.toolsetPaths|select(type == "array")[]) |= $root + .
+            | del(.root)
+        )
+        | if $target_triple|length != 0 then .[$target_triple] end
     ' <<<"${target_triple_to_sdk_configuration_json}"
 ) || error_exit "${0}" "Failed to get configuration for ${target_triple}"
 

@@ -1,0 +1,3 @@
+external-sources=true
+source-path=SCRIPTDIR
+source-path=swift-wrappers

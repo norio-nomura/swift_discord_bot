@@ -1,0 +1,201 @@
+#!/bin/bash -eu
+[[ -n ${DEBUG:-} ]] && set -x
+set -o pipefail
+
+# print the error message and exit with status 1
+function error_exit() {
+	echo "$(basename "${1}"): Error: ${*:2}" >&2
+	exit 1
+}
+
+# check if the variable is an array. it works whether it is empty or not.
+function is_array() {
+	attribute=$(declare -p "${1}" 2>/dev/null) && [[ ${attribute} == "declare -a ${1}"* ]]
+}
+
+####################################################################################################
+# Process ancestors Helpers
+####################################################################################################
+
+# process ancestors of the current process
+function fetch_ancestors() {
+	# shellcheck disable=SC2310
+	is_array ancestors && return
+	local sid pids ancestor_list
+	sid=$(ps -o sid= -p $$ | tr -d ' ') # session id of the current process
+	pids=$(
+		children=$(pgrep --delimiter '|' --parent $$) # children of the current process have the same prcess name
+		bash -c 'pgrep -s '"${sid}"' ^swift- | grep -v -E "^('$$"|${children})\$\" | paste -sd, -"
+	)
+	declare -g -a ancestors
+	[[ -z ${pids} ]] && return
+	ancestor_list=$(ps kstart ocomm= p"${pids}" | sed 's/^swift-//')
+	mapfile -t ancestors < <(printf "%s" "${ancestor_list}")
+}
+
+# check if the current process has the ancestor with the given name
+function has_ancestor() {
+	fetch_ancestors
+	[[ " ${ancestors[*]} " == *" ${1#swift-} "* ]]
+}
+
+# get the real basename of the given command by resolving the symbolic link
+function real_basename() {
+	command -v "swift-${1}" | xargs realpath | xargs basename | sed 's/^swift-//'
+}
+
+# check if the current process has the real ancestor with the given name
+function has_real_ancestor() {
+	local real_basename
+	real_basename=$(real_basename "${1}")
+	fetch_ancestors
+	for ancestor in "${ancestors[@]}"; do
+		real_ancestor=$(real_basename "${ancestor}")
+		[[ ${real_ancestor} == "${real_basename}" ]] && echo "${ancestor}" && return 0
+	done
+	return 1
+}
+
+####################################################################################################
+# Command helpers
+####################################################################################################
+
+# get the command name from the path
+function command_from_path() {
+	basename "${0}" | sed 's/^swift-//'
+}
+
+# get the real command name from the path
+function real_command_from_path() {
+	command -v "${0}" | xargs realpath | xargs basename | sed 's/^swift-//'
+}
+
+# shellcheck disable=SC2034
+current_command=$(command_from_path "${0}")
+# shellcheck disable=SC2034
+current_real_command=$(real_command_from_path "${0}")
+
+# prepare the next commands to be executed. fail if next_commands is empty
+function prepare_next_commands() {
+	# shellcheck disable=SC2310
+	if ! is_array next_commands; then
+		declare -g -a next_commands
+		while [[ ${1:-} == [^-]* ]]; do
+			next_commands+=("${1}")
+			shift
+		done
+	fi
+	test -v next_commands
+}
+
+# prepend the given command to the next commands
+function prepend_next_commands() {
+	missing_commands=()
+	for command in "$@"; do
+		# shellcheck disable=SC2310
+		has_ancestor "${command}" && continue
+		[[ " ${next_commands[*]} " == *" ${command} "* ]] || missing_commands+=("${command}")
+	done
+	[[ -v missing_commands ]] && next_commands=("${missing_commands[@]}" "${next_commands[@]}")
+}
+
+# remove the given command from the next commands
+function remove_from_next_commands() {
+	prepare_next_commands "$@"
+	# shellcheck disable=SC2206
+	for i in "${!next_commands[@]}"; do
+		[[ ${next_commands[i]} == "${1}" ]] && unset "next_commands[i]" && removed=1
+	done
+	[[ -v removed ]] && next_commands=("${next_commands[@]}")
+}
+
+# call the next commands
+function call_next_commands() {
+	# shellcheck disable=SC2310
+	prepare_next_commands "$@" || next_commands+=("exec")
+	export -n EXEC
+	if [[ -v EXEC ]]; then
+		exec "swift-${next_commands[0]}" "${next_commands[@]:1}" "${@}"
+	else
+		"swift-${next_commands[0]}" "${next_commands[@]:1}" "${@}"
+	fi
+}
+
+# call the remaining next commands
+function call_remaining_next_commands() {
+	# shellcheck disable=SC2310
+	prepare_next_commands "$@" && call_next_commands "$@"
+	:
+}
+
+# skip to the next command if the real ancestor exists
+function skip_to_next_if_executed() {
+	local name ancestor
+	name=$(real_basename "${1}")
+	# shellcheck disable=SC2310
+	ancestor=$(has_real_ancestor "${name}") || return 0
+	shift
+	echo "Skip ${name} because ${ancestor} is already running" >&2
+	EXEC=1 call_next_commands "$@"
+}
+
+# prevent recursive execution of the current command by skipping to the next command
+function prevent_recursive_execution() {
+	# shellcheck disable=SC2310
+	has_real_ancestor "${current_real_command}" && EXEC=1 call_next_commands "$@"
+	:
+}
+
+# call the command with time if USE_TIME is set
+function call_command() {
+	if [[ -v USE_TIME ]]; then
+		TIME=$(cat <<-EOF
+			--
+			Command being timed: ${1}
+			%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata %Mmax)k
+			%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps
+			--
+		EOF
+		)
+		export TIME
+		set -- time "${@}"
+	fi
+	"${@}"
+}
+
+####################################################################################################
+# SDK helpers
+####################################################################################################
+
+# prepare swift arguments for the sdk and use swiftc if required
+function prepare_swift_args_for_sdk_and_use_swiftc() {
+	local target_triple="${USE_SWIFT_TARGET_TRIPLE:-}"
+	[[ -z ${target_triple} ]] && return
+	# parse the target triple to get the sdk triple and USE_SWIFTC
+	sdk_triple_use_swiftc=$(sed -n -E '
+		s/^(arm64|x86_64)-apple-ios([0-9.]+)?$/\1-apple-ios/p
+		s/^(arm64|x86_64)-apple-ios([0-9.]+)?-simulator$/\1-apple-ios-simulator/p
+		s/^(arm64|x86_64)-apple-macosx([0-9.]+)?$/\1-apple-macosx/p
+		s/^(arm64|x86_64)-apple-ios([0-9.]+)?-macabi$/\1-apple-macosx/p
+		s/^(aarch64|x86_64)-swift-linux-musl$/\1-swift-linux-musl/p
+		s/^wasm32-unknown-wasi$/wasm32-unknown-wasi\t1/p
+	' <<<"${target_triple}")
+	read -r sdk_triple USE_SWIFTC <<<"${sdk_triple_use_swiftc}"
+	[[ -n ${sdk_triple} ]] || error_exit "${0}" "Unknown target: ${target_triple}"
+	# some target requires USE_SWIFTC
+	[[ -n ${USE_SWIFTC} ]] && export USE_SWIFTC=1
+	# prepare swift arguments for the sdk
+	declare -g -a swift_args_for_sdk=(-target "${target_triple}")
+	swift_args_for_sdk_output=$(swift-args-for-sdk "${sdk_triple}" "$@")
+	mapfile -O "${#swift_args_for_sdk[@]}" -t swift_args_for_sdk <<<"${swift_args_for_sdk_output}"
+}
+
+# prepare code for testing
+function prepare_swift_testing() {
+	# shellcheck disable=SC2310
+	remove_from_next_commands testing && prepend_next_commands testing && EXEC=1 call_next_commands "$@"
+	:
+}
+
+# return if this script is sourced
+[[ ${BASH_SOURCE[0]} != "${0}" ]] || return 0

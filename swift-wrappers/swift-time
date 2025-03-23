@@ -1,23 +1,8 @@
 #!/bin/bash -eu
-[[ -n ${DEBUG:-} ]] && set -x
-set -o pipefail
+. swift-bot-helper
 
-# print the error message and exit with status 1
-function error_exit() {
-	echo "$(basename "${1}"): Error: ${*:2}" >&2
-	exit 1
-}
+# shellcheck disable=SC2310
+prepare_next_commands "$@" && shift ${#next_commands[@]}
 
-commands=()
-while [[ ${1:-} == [^-]* ]]; do
-	commands+=("${1}")
-	shift
-done
-
-time=("time")
-
-if [[ ${#commands[@]} -eq 0 ]]; then
-	"${time[@]}" swift "$@"
-else
-	"${time[@]}" "swift-${commands[0]}" "${commands[@]:1}" "$@"
-fi
+export USE_TIME=1
+call_next_commands "$@"

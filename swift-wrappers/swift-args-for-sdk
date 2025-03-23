@@ -1,12 +1,5 @@
 #!/bin/bash -eu
-[[ -n ${DEBUG:-} ]] && set -x
-set -o pipefail
-
-# print the error message and exit with status 1
-function error_exit() {
-	echo "$(basename "${1}"): Error: ${*:2}" >&2
-	exit 1
-}
+. swift-bot-helper
 
 target_triple=${1:-}
 [[ -n ${target_triple} ]] || error_exit "${0}" "missing target_triple"
@@ -28,7 +21,7 @@ jq_output=$(
         ' "${toolsetPath}" || error_exit "${0}" "Failed to parse ${toolsetPath}"
 	done
 ) || error_exit "${0}" "Failed to parse toolsetPaths"
-while IFS= read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${jq_output}"
+mapfile -t SWIFT_ARGS_FOR_SDK <<<"${jq_output}"
 
 [[ " ${SWIFT_ARGS_FOR_SDK[*]} " == *" -static-stdlib "* || " $* " == *" -static-stdlib "* ]] && resourcePathKey="swiftStaticResourcesPath" || resourcePathKey="swiftResourcesPath"
 
@@ -40,6 +33,6 @@ jq_output=$(
         , (.[$resourcePathKey]|select(.)|("-resource-dir","\(.)/clang"|("-Xclang-linker",.)),("-resource-dir",.))
     ' <<<"${sdk_configuration}"
 ) || error_exit "${0}" "Failed to parse SDK configuration"
-while IFS= read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${jq_output}"
+mapfile -O ${#SWIFT_ARGS_FOR_SDK} -t SWIFT_ARGS_FOR_SDK <<<"${jq_output}"
 
-echo "${SWIFT_ARGS_FOR_SDK[@]}"
+printf "%s\n" "${SWIFT_ARGS_FOR_SDK[@]}"

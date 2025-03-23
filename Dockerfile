@@ -345,6 +345,9 @@ RUN <<'EOF'
     for target in $(swift-use-sdk --list-targets); do
         ln -sf /usr/bin/swift-use-sdk "/usr/bin/swift-${target}"
     done
+    for target in $(swift-exec-wasi --list-runtimes); do
+        ln -sf /usr/bin/swift-exec-wasi "/usr/bin/swift-${target}"
+    done
 EOF
 
 # use the bot user
@@ -363,7 +366,7 @@ COPY --from=apt-get-update /* /usr/local/bin/
 # Setup for debugging in VSCode
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt <<EOF
     # Install git and sudo
-    apt-get-install git sudo
+    apt-get-install git shellcheck shfmt sudo
 
     # Create a user for debugging
     useradd -m "${DEBUGGER_USERNAME}"
@@ -372,7 +375,7 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,t
 
     # override scripts with symbolic links against the workspace
     scripts=(
-        args-for-sdk darwin-deployment-target exec sdk-configuration swiftc testing time use-sdk wasmkit-cli wasmtime wazero
+        args-for-sdk bot-helper darwin-deployment-target exec exec-wasi sdk-configuration swiftc testing time use-sdk
     )
     for override in "${scripts[@]}"; do
         ln -sf "/workspaces/swift_discord_bot/swift-wrappers/swift-${override}" "/usr/bin/swift-${override}"
