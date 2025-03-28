@@ -1,8 +1,0 @@
-#!/bin/bash -eu
-. swift-bot-helper
-
-# shellcheck disable=SC2310
-prepare_next_commands "$@" && shift ${#next_commands[@]}
-
-export USE_TIME=1
-call_next_commands "$@"

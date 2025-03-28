@@ -338,17 +338,10 @@ EOF
 COPY --from=wasmkit-builder /usr/bin/wasmkit-cli /usr/local/bin/
 
 # install swift-* wrapper scripts
-COPY --chmod=755 swift-wrappers/* /usr/bin/
+COPY --chmod=755 swift-wrappers/swift-+ /usr/bin/
 
-# create symbolic links to swift-use-sdk
-RUN <<'EOF'
-    for target in $(swift-use-sdk --list-targets); do
-        ln -sf /usr/bin/swift-use-sdk "/usr/bin/swift-${target}"
-    done
-    for target in $(swift-exec-wasi --list-runtimes); do
-        ln -sf /usr/bin/swift-exec-wasi "/usr/bin/swift-${target}"
-    done
-EOF
+# create symbolic links to swift-+
+RUN /usr/bin/swift-+ --install-shortcuts
 
 # use the bot user
 USER $USERNAME
@@ -374,9 +367,7 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,t
     chmod 0440 "/etc/sudoers.d/${DEBUGGER_USERNAME}"
 
     # override scripts with symbolic links against the workspace
-    scripts=(
-        args-for-sdk bot-helper darwin-deployment-target exec exec-wasi sdk-configuration swiftc testing time use-sdk
-    )
+    scripts=( + )
     for override in "${scripts[@]}"; do
         ln -sf "/workspaces/swift_discord_bot/swift-wrappers/swift-${override}" "/usr/bin/swift-${override}"
     done

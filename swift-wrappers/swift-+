@@ -1,0 +1,651 @@
+#!/usr/bin/env bash
+[[ -n ${DEBUG:-} ]] && set -x
+set -eu -o pipefail
+
+function swift-help() {
+	cat <<'EOF'
+Usage: swift + [subcommand ...] [options for swift]
+
+# Subcommands:
+    +         Entry point. Supports --install-shortcuts, --list-commands options.
+    exec      Execute code with swift, swiftc, or WASI runtimes.
+    swiftc    Compile code with swiftc and generate the main executable.
+    testing   Prepare stdin code for swift-testing. Uses swiftc automatically.
+    time      Use time(1) to measure execution of main, swift, swiftc, or WASI runtimes.
+
+# Subcommands to print SDK information:
+    args-for-sdk       <triple> <sdk>  Print swift arguments for the SDK.
+    sdk-configuration  <triple> <sdk>  Print SDK configuration as JSON.
+    * Regular expressions can be used for <triple> and <sdk>. *
+
+# Subcommands to use SDKs:
+    [Static Linux SDK](https://www.swift.org/download)
+        musl|static
+
+    [SwiftWasm SDK](https://github.com/swiftwasm/swift)
+        wasi|wasm|wasm32
+        * Uses exec-wasi to execute the main executable.
+
+    [swift-sdk-darwin](https://github.com/kabiroberai/swift-sdk-darwin)
+        ios|iphone
+        ios-simulator|iphonesimulator
+        macos
+        ios-macabi|iosmac|mac-catalyst
+        darwin-deployment-target <triple> <platform>  Print default deployment target.
+
+# Subcommands to execute main with WASI runtime:
+    exec-wasi    Use the default WASI runtime (wasmkit-cli).
+    wasmkit-cli
+    wasmtime
+    wazero
+    * If multiple WASI runtimes are specified, they will be executed sequentially.
+
+# Usage examples:
+
+## Compile the code with SwiftWasm SDK and execute it with wasmkit-cli
+
+    echo 'print("Hello, WASI!")' | swift + wasi -
+
+## Compile the test code using swift-testing and execute it
+
+    echo '
+    @Test func helloWorld() {
+        let greeting = "Hello, world!"
+        #expect(greeting == "Hello") // Expectation failed: (greeting → "Hello, world!") == "Hello"
+    }' | swift + testing -
+
+EOF
+}
+
+function swift-print-license() {
+	cat <<'EOF'
+The MIT License (MIT)
+
+Copyright (c) 2025 Norio Nomura
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+EOF
+}
+
+# print the error message and exit with status 1
+function error_exit() {
+	echo "$(basename "${1}"): Error: ${*:2}" >&2
+	exit 1
+}
+
+# check if the variable is an array. it works whether it is empty or not.
+function is_array() {
+	attribute=$(declare -p "${1}" 2>/dev/null) && [[ ${attribute} == "declare -a ${1}"* ]]
+}
+
+####################################################################################################
+# Subcommand helpers
+####################################################################################################
+
+# get the sub command name from the path
+function subcommand_from_path() {
+	basename "${0}" | sed 's/^swift-//'
+}
+
+# prepare the next subcommands to be executed. fail if next_subcommands is empty
+function prepare_next_subcommands() {
+	# shellcheck disable=SC2310
+	if ! is_array next_subcommands; then
+		declare -g -a next_subcommands
+		while [[ ${1:-} == [^-]* ]]; do
+			next_subcommands+=("${1}")
+			shift
+		done
+	fi
+	test -n "${next_subcommands[*]}"
+}
+
+# prepend the given subcommand to the next commands
+function prepend_next_subcommands() {
+	missing_subcommands=()
+	for subcommand in "$@"; do
+		# shellcheck disable=SC2310
+		has_ancestor "${subcommand}" && continue
+		[[ " ${next_subcommands[*]} " == *" ${subcommand} "* ]] || missing_subcommands+=("${subcommand}")
+	done
+	[[ -n ${missing_subcommands[*]} ]] && next_subcommands=("${missing_subcommands[@]}" "${next_subcommands[@]}")
+}
+
+# remove the given command from the next commands
+function remove_from_next_subcommands() {
+	prepare_next_subcommands "$@"
+	# shellcheck disable=SC2206
+	for i in "${!next_subcommands[@]}"; do
+		[[ ${next_subcommands[i]} == "${1}" ]] && unset "next_subcommands[i]" && removed=1
+	done
+	[[ -n ${removed:-} ]] && next_subcommands=("${next_subcommands[@]}")
+}
+
+# call the next commands
+function call_next_subcommands() {
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" || next_subcommands+=("exec")
+	export -n EXEC
+	next_current="${next_subcommands[0]}"
+	next_subcommands=("${next_subcommands[@]:1}")
+	if type -t "swift-${next_current}" &>/dev/null; then
+		commands=("swift-${next_current}")
+	else
+		commands=(swift "${next_current}")
+		# shellcheck disable=SC2310
+		prepare_swift_args_for_sdk_and_use_swiftc "$@" && set -- "${swift_args_for_sdk[@]}" "$@"
+	fi
+	# if the command[0] is executable, use exec to replace the current process
+	type -P "${commands[0]}" &>/dev/null && EXEC="${EXEC:+exec}" || EXEC=
+	[[ -z ${EXEC} ]] && SWIFT_PLUS_ANCESTORS+=" ${SWIFT_PLUS_CURRENT} "
+	SWIFT_PLUS_ANCESTORS="${SWIFT_PLUS_ANCESTORS:-}" SWIFT_PLUS_CURRENT="${next_current}" ${EXEC:-} "${commands[@]}" "${next_subcommands[@]}" "${@}"
+}
+
+# check if the current command has the ancestor with the given name
+function has_ancestor() {
+	[[ " ${SWIFT_PLUS_ANCESTORS:-} " == *" ${1#swift-} "* ]]
+}
+
+# call the remaining next commands
+function call_remaining_next_subcommands() {
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && call_next_subcommands "$@"
+	:
+}
+
+# skip to the next command if the ancestor exists
+function skip_to_next_if_executed() {
+	# shellcheck disable=SC2310
+	has_ancestor "${1}" || return 0
+	shift
+	echo >&2 "Skip ${1} because already executed"
+	EXEC=1 call_next_subcommands "$@"
+}
+
+# prevent second execution of the current command by skipping to the next command
+function prevent_second_execution() {
+	# shellcheck disable=SC2310
+	has_ancestor "${SWIFT_PLUS_CURRENT}" && EXEC=1 call_next_subcommands "$@"
+	:
+}
+
+# call the command with time if USE_TIME is set
+function call_command() {
+	if [[ -n ${USE_TIME:-} ]]; then
+		TIME=$(
+			cat <<-EOF
+				--
+				Command being timed: ${1}
+				%Uuser %Ssystem %Eelapsed %PCPU (%Xtext+%Ddata %Mmax)k
+				%Iinputs+%Ooutputs (%Fmajor+%Rminor)pagefaults %Wswaps
+				--
+			EOF
+		)
+		export TIME
+		set -- time "${@}"
+	fi
+	"${@}"
+}
+
+####################################################################################################
+# misc helpers
+####################################################################################################
+
+# prepare swift arguments for the sdk and use swiftc if required
+function prepare_swift_args_for_sdk_and_use_swiftc() {
+	local target_triple="${USE_SWIFT_TARGET_TRIPLE:-}"
+	[[ -z ${target_triple} ]] && return
+	# parse the target triple to get the sdk triple and USE_SWIFTC
+	sdk_triple_use_swiftc=$(sed -n -E '
+		s/^(arm64|x86_64)-apple-ios([0-9.]+)?$/\1-apple-ios/p
+		s/^(arm64|x86_64)-apple-ios([0-9.]+)?-simulator$/\1-apple-ios-simulator/p
+		s/^(arm64|x86_64)-apple-macosx([0-9.]+)?$/\1-apple-macosx/p
+		s/^(arm64|x86_64)-apple-ios([0-9.]+)?-macabi$/\1-apple-macosx/p
+		s/^(aarch64|x86_64)-swift-linux-musl$/\1-swift-linux-musl/p
+		s/^wasm32-unknown-wasi$/wasm32-unknown-wasi\t1/p
+	' <<<"${target_triple}")
+	read -r sdk_triple USE_SWIFTC <<<"${sdk_triple_use_swiftc}"
+	[[ -n ${sdk_triple:-} ]] || error_exit "${0}" "Unknown target: ${target_triple}"
+	# some target requires USE_SWIFTC
+	[[ -n ${USE_SWIFTC:-} ]] && export USE_SWIFTC=1
+	# prepare swift arguments for the sdk
+	declare -g -a swift_args_for_sdk=(-target "${target_triple}")
+	swift_args_for_sdk_output=$(swift-args-for-sdk "${sdk_triple}" "" "$@")
+	mapfile -O "${#swift_args_for_sdk[@]}" -t swift_args_for_sdk <<<"${swift_args_for_sdk_output}"
+}
+
+# prepare code for testing
+function prepare_swift_testing() {
+	# shellcheck disable=SC2310
+	remove_from_next_subcommands testing && prepend_next_subcommands testing && EXEC=1 call_next_subcommands "$@"
+	:
+}
+
+function use_darwin_sdk() {
+	sdk_triple="${1}"
+	target_triple="${2}"
+	darwin_platform_name="${3}"
+	shift 3
+	# parse $1 as deployment target if it is a number
+	if [[ ${1:-} =~ [0-9]+\.[0-9]+ ]]; then
+		darwin_deployment_target="${1}"
+		shift
+	fi
+
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	skip_to_next_if_executed exec "$@"
+
+	# embed darwin_arch
+	darwin_arch=$(arch)
+	darwin_arch=${darwin_arch/aarch64/arm64}
+
+	sdk_triple=${sdk_triple//\{darwin_arch\}/${darwin_arch}}
+	target_triple=${target_triple//\{darwin_arch\}/${darwin_arch}}
+
+	# Detect default deployment target from SDKSettings.json
+	[[ -z ${darwin_deployment_target:-} ]] && darwin_deployment_target=$(
+		swift-darwin-deployment-target "${sdk_triple}" "${darwin_platform_name:-}"
+	)
+	target_triple=${target_triple//\{darwin_deployment_target\}/${darwin_deployment_target}}
+
+	export USE_SWIFT_TARGET_TRIPLE=${target_triple}
+	call_next_subcommands "${swift_args_for_sdk[@]}" "$@"
+
+}
+
+####################################################################################################
+# Command definitions
+####################################################################################################
+
+# command for the entry point
+function swift-+() {
+	case "${1:-}" in
+	--install-shortcuts)
+		basename=$(basename "${0}")
+		full_path=$(command -v "${0}")
+		[[ -n ${full_path} ]] || error_exit "${FUNCNAME[0]}" "command not found: ${0}"
+		dir=$(dirname "${full_path}")
+		[[ -d ${dir} ]] || error_exit "${FUNCNAME[0]}" "directory not found: ${dir}"
+		functions=$(declare -F | awk '$3 ~ /^swift-/ {print $3}' | grep -v "${FUNCNAME[0]}" | sort)
+		for command in ${functions}; do
+			[[ -f "${dir}/${command}" ]] || ln -s "${basename}" "${dir}/${command}"
+		done
+		exit
+		;;
+	--list-commands)
+		declare -F | awk '$3 ~ /^swift-/ {print $3}' | sort
+		exit
+		;;
+	*) ;;
+	esac
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+	call_next_subcommands "$@"
+}
+
+# prints swift arguments for specified target triple and sdk id
+function swift-args-for-sdk() {
+	command -v jq &>/dev/null || error_exit "${FUNCNAME[0]}" "jq is required"
+
+	target_triple=${1:-} sdk_id=${2:-}
+
+	# ignore target_triple if it is "-"
+	[[ ${target_triple} == "-" ]] && target_triple=""
+	[[ ${sdk_id} == "-" ]] && sdk_id=""
+	[[ -n ${target_triple} ]] || error_exit "${FUNCNAME[0]}" "missing target_triple"
+
+	sdk_configuration=$(swift-sdk-configuration "${target_triple}" "${sdk_id}")
+
+	# Build SWIFT_ARGS_FOR_SDK from configuration by jq
+	flags_from_toolsets=$(
+		for toolsetPath in $(jq --raw-output '.toolsetPaths[]' <<<"${sdk_configuration}"); do
+			# shellcheck disable=SC2310
+			jq --raw-output --arg toolsetDir "$(dirname "${toolsetPath}")" '
+            "\($toolsetDir)/\(.rootPath // ".")" as $rootPath
+            | (.linker?.path|select(.)|"-ld-path=\($rootPath)/\(.)")
+            , ("-tools-directory",$rootPath|("-Xfrontend",.))
+            , (.swiftCompiler?.extraCLIOptions[]?)
+            , (.cCompiler?.extraCLIOptions[]?|("-Xcc",.))
+            , (.cxxCompiler?.extraCLIOptions[]?|("-Xcxx",.))
+            , (.linker?.extraCLIOptions[]?|("-Xlinker",.))
+        ' "${toolsetPath}" || error_exit "${FUNCNAME[0]}" "Failed to parse ${toolsetPath}"
+		done
+	) || error_exit "${FUNCNAME[0]}" "Failed to parse toolsetPaths"
+	while read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${flags_from_toolsets}"
+
+	[[ " ${SWIFT_ARGS_FOR_SDK[*]} $* " == *" -static-stdlib "* ]] && isStatic="Static"
+
+	flags_from_sdk_configuration=$(
+		jq --raw-output --arg resourcePathKey "swift${isStatic:-}ResourcesPath" '
+        (.includeSearchPaths[]?|("-I",.))
+        , (.librarySearchPaths[]?|("-L",.))
+        , (.sdkRootPath|select(.)|("-sdk",.),("-isysroot",.|("-Xclang-linker",.)))
+        , (.[$resourcePathKey]|select(.)|("-resource-dir","\(.)/clang"|("-Xclang-linker",.)),("-resource-dir",.))
+    ' <<<"${sdk_configuration}"
+	) || error_exit "${FUNCNAME[0]}" "Failed to parse SDK configuration"
+	while read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${flags_from_sdk_configuration}"
+
+	printf "%s\n" "${SWIFT_ARGS_FOR_SDK[@]}"
+}
+
+# execute the code with swift
+function swift-exec() {
+	prevent_second_execution "$@"
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	# shellcheck disable=SC2310
+	if has_ancestor swiftc; then
+		[[ -x main ]] || exit 0 # error_exit "${FUNCNAME[0]}" "main is not an executable file"
+		file_info=$(file -b main)
+		set +e
+		case "${file_info}" in
+		ELF*)
+			call_command ./main "$@"
+			status=$?
+			[[ ! -f main ]] || rm main
+			exit "${status}"
+			;;
+		WebAssembly*)
+			prepend_next_subcommands exec-wasi
+			call_next_subcommands "$@"
+			status=$?
+			[[ ! -f main ]] || rm main
+			exit "${status}"
+			;;
+		*)
+			echo "can not execute main: ${file_info}" >&2
+			exit 1
+			;;
+		esac
+	else
+		if [[ -n ${USE_SWIFTC:-} ]]; then
+			prepend_next_subcommands swiftc
+			EXEC=1 call_next_subcommands "$@"
+		else
+			# Check USE_SWIFT_TARGET_TRIPLE
+			# shellcheck disable=SC2310
+			prepare_swift_args_for_sdk_and_use_swiftc "$@" && set -- "${swift_args_for_sdk[@]}" "$@"
+			prepare_swift_testing "$@"
+			call_command swift "$@"
+		fi
+	fi
+}
+
+# prints the sdk configuration as JSON for the given target triple and sdk id
+function swift-sdk-configuration() {
+	command -v jq &>/dev/null || error_exit "${FUNCNAME[0]}" "jq is required"
+
+	target_triple=${1:-} sdk_id=${2:-}
+	# ignore target_triple if it is "-"
+	[[ ${target_triple} == "-" ]] && target_triple=""
+	[[ ${sdk_id} == "-" ]] && sdk_id=""
+
+	# { sdk_json_path: sdk_id }
+	swift_sdk_json_to_sdk_id=$(
+		shopt -s nullglob
+		jsons=(~/{.swiftpm,Library/org.swift.swiftpm}/swift-sdks/*/info.json)
+		[[ ${#jsons[@]} -ne 0 ]] || error_exit "${FUNCNAME[0]}" "No info.json files found in swift-sdks"
+		jq --raw-output '
+		.artifacts|to_entries[]|.key as $sdk_id|.value|.variants[]|{((input_filename|sub("[^/]+$";""))+.path+"/swift-sdk.json"): $sdk_id}
+	' "${jsons[@]}" | jq --slurp 'add' # use separated jq to avoid incorrect input_filename with --slurp
+	)
+	swift_sdk_jsons_list=$(jq -r 'keys[]' <<<"${swift_sdk_json_to_sdk_id}")
+	while read -r line; do swift_sdk_jsons+=("${line}"); done <<<"${swift_sdk_jsons_list}"
+	[[ ${#swift_sdk_jsons[@]} -ne 0 ]] || error_exit "${FUNCNAME[0]}" "No swift-sdk.json files found in swift-sdks"
+
+	# { target_triple: { sdk_id: sdk_configuration } }
+	sdk_configurations=$(
+		jq --argjson sdk_ids "${swift_sdk_json_to_sdk_id}" '
+        .targetTriples|map_values(.root = (input_filename|rtrimstr("swift-sdk.json")))|map_values({($sdk_ids[input_filename]):.})
+    ' "${swift_sdk_jsons[@]}" | jq --slurp '
+		map(to_entries[])|reduce .[] as $x ({}; .[$x.key] += $x.value)
+	' # use separated jq to avoid incorrect input_filename with --slurp
+	)
+	# { target_triple: { sdk_id: sdk_configuration } } || { sdk_id: sdk_configuration } || sdk_configuration
+	sdk_configuration=$(
+		jq --exit-status --raw-output --arg target_triple "${target_triple}" --arg sdk_id "${sdk_id}" '
+		def match_keys($key): if $key|length then if has($key) then .[$key] else with_entries(select(.key|test($key))) end end;
+		def unwrap_if_one: if length == 1 then [.[]]|first else . end;
+		map_values(map_values(
+			.root as $root
+			| (.sdkRootPath,.swiftResourcesPath,.swiftStaticResourcesPath|select(type == "string")) |= $root + .
+			| (.includeSearchPaths,.librarySearchPaths,.toolsetPaths|select(type == "array")[]) |= $root + .
+			| del(.root)
+		))
+		| match_keys($target_triple) | map_values(match_keys($sdk_id)) | with_entries(select(.value|length)) | unwrap_if_one | unwrap_if_one
+	' <<<"${sdk_configurations}"
+	) || error_exit "${FUNCNAME[0]}" "Failed to get configuration for target_triple: '${target_triple}', sdk_id: '${sdk_id}'"
+
+	jq <<<"${sdk_configuration}"
+	# is sdk_configuration a valid JSON object?
+	jq --exit-status 'has("sdkRootPath")' <<<"${sdk_configuration}" &>/dev/null || error_exit "${FUNCNAME[0]}" "Multiple SDK configuration found for matching target_triple: '${target_triple}', sdk_id: '${sdk_id}'"
+}
+
+# execute swiftc
+function swift-swiftc() {
+	prevent_second_execution "$@"
+
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	# Check USE_SWIFT_TARGET_TRIPLE
+	# shellcheck disable=SC2310
+	prepare_swift_args_for_sdk_and_use_swiftc "$@" && set -- "${swift_args_for_sdk[@]}" "$@"
+
+	# Prepare swift-testing
+	prepare_swift_testing "$@"
+
+	# stop exporting USE_SWIFTC
+	export -n USE_SWIFTC
+
+	# split $@ by "--" and move the arguments before "--" to swiftc_flags
+	swiftc_flags=("$@")
+	set --
+	for i in "${!swiftc_flags[@]}" ""; do
+		[[ -n ${i} && ${swiftc_flags[i]} == -- ]] && break
+	done && {
+		set -- "${swiftc_flags[@]:i+1}"
+		swiftc_flags=("${swiftc_flags[@]:0:i}")
+	}
+
+	# if $@ contains "-", move "-" to swiftc_flags
+	removing_hyphen=("$@")
+	for i in "${!removing_hyphen[@]}" ""; do
+		[[ -n ${i} && ${removing_hyphen[i]} == "-" ]] && break
+	done && {
+		swiftc_flags+=("-")
+		set -- "${removing_hyphen[@]:0:i}" "${removing_hyphen[@]:i+1}"
+	}
+
+	# execute swiftc with swiftc_flags
+	call_command swiftc "${swiftc_flags[@]}"
+
+	# following commands are for the main executable file
+	call_next_subcommands "$@"
+}
+
+# prepare code from stdin for testing
+function swift-testing() {
+	prevent_second_execution "$@"
+	skip_to_next_if_executed swiftc "$@"
+
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	# becasue swift-testing requires an executable file to getting the test entry points, use swiftc
+	export USE_SWIFTC=1
+
+	code=$(cat)
+	# check if "import Testing" is present in the code, prepare to prepend it
+	grep -q "^import Testing$" <<<"${code}" || import=$'import Testing\n'
+
+	entry_point_method="Testing.__swiftPMEntryPoint()"
+	if [[ ${code} != *"${entry_point_method}"* ]]; then
+		entry_point_call="await ${entry_point_method} as Never"
+		# check if -parse-as-library is present in the arguments, use @main struct
+		[[ " $* " == *" -parse-as-library "* ]] && entry_point_call=$(
+			cat <<-EOF
+				@main struct Runner {
+					static func main() async {
+						${entry_point_call}
+					}
+				}
+			EOF
+		)
+	fi
+
+	call_next_subcommands "$@" <<-EOF
+		${import:-}${code}
+		${entry_point_call:-}
+	EOF
+}
+
+function swift-time() {
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	export USE_TIME=1
+	call_next_subcommands "$@"
+}
+
+####################################################################################################
+# Command definitions to use SDKs
+####################################################################################################
+
+# prints the deployment target for the given target triple and platform name
+function swift-darwin-deployment-target() {
+	target_triple=${1:-} darwin_platform_name=${2:-}
+	[[ -n ${target_triple} ]] || error_exit "${FUNCNAME[0]}" "missing target_triple"
+
+	sdk_configuration=$(swift-sdk-configuration "${target_triple}")
+
+	# Detect deployment target from SDKSettings.json
+	sdk_root_path=$(jq -r '.sdkRootPath' <<<"${sdk_configuration}")
+	sdk_settings="${sdk_root_path}/SDKSettings.json"
+	[[ -f ${sdk_settings} ]] || error_exit "${FUNCNAME[0]}" "SDKSettings.json not found in ${sdk_root_path}"
+	darwin_deployment_target=$(
+		jq --raw-output --argjson darwin "{${darwin_platform_name:+\"platform_name\":\"${darwin_platform_name}\"}}" '
+        ($darwin.platform_name // .DefaultProperties.PLATFORM_NAME) as $darwin_platform_name
+        |.SupportedTargets[$darwin_platform_name].DefaultDeploymentTarget
+    ' "${sdk_settings}"
+	) || error_exit "${FUNCNAME[0]}" "Failed to get deployment target for ${darwin_platform_name}"
+	echo "${darwin_deployment_target}"
+}
+
+# commands to use the darwin sdk
+function swift-ios() {
+	use_darwin_sdk '{darwin_arch}-apple-ios' '{darwin_arch}-apple-ios{darwin_deployment_target}' '' "$@"
+}
+function swift-iphone() { swift-ios "$@"; }
+
+function swift-ios-simulator() {
+	use_darwin_sdk '{darwin_arch}-apple-ios-simulator' '{darwin_arch}-apple-ios{darwin_deployment_target}-simulator' '' "$@"
+}
+function swift-iphonesimulator() { swift-ios-simulator "$@"; }
+
+function swift-macos() {
+	use_darwin_sdk '{darwin_arch}-apple-macosx' '{darwin_arch}-apple-macosx{darwin_deployment_target}' '' "$@"
+}
+
+function swift-ios-macabi() {
+	use_darwin_sdk '{darwin_arch}-apple-macosx' '{darwin_arch}-apple-ios{darwin_deployment_target}-macabi' 'iosmac' "$@"
+}
+function swift-iosmac() { swift-ios-macabi "$@"; }
+function swift-mac-catalyst() { swift-ios-macabi "$@"; }
+
+# commands to use the static linux sdk
+function swift-musl() {
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	target_triple="$(arch)-swift-linux-musl"
+	export USE_SWIFT_TARGET_TRIPLE=${target_triple}
+	call_next_subcommands "$@"
+}
+function swift-static() { swift-musl "$@"; }
+
+# commands to use the wasm sdk
+function swift-wasi() {
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	target_triple="wasm32-unknown-wasi"
+	export USE_SWIFT_TARGET_TRIPLE=${target_triple}
+	export USE_SWIFTC=1
+	call_next_subcommands "$@"
+}
+function swift-wasm() { swift-wasi "$@"; }
+function swift-wasm32() { swift-wasi "$@"; }
+
+# compile the code with the wasm sdk, then execute it with wasm runtime
+function swift-exec-wasi() {
+	if [[ ${1:-} == "--list-runtimes" ]]; then
+		echo wasmkit-cli wasmtime wazero
+		exit
+	fi
+
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	# shellcheck disable=SC2310
+	if [[ ! -x main ]]; then
+		prepend_next_subcommands wasi swiftc "${SWIFT_PLUS_CURRENT}" && EXEC=1 call_next_subcommands "$@"
+		error_exit "${FUNCNAME[0]}" "main is not an executable file"
+	fi
+
+	set +e
+	case "${SWIFT_PLUS_CURRENT}" in
+	exec-wasi | wasmkit-cli)
+		call_command wasmkit-cli run --dir . main "$@"
+		;;
+	wasmtime)
+		call_command wasmtime run --dir . main "$@"
+		;;
+	wazero)
+		call_command wazero run --mount . main "$@"
+		;;
+	*)
+		error_exit "${FUNCNAME[0]}" "unexpected command: ${SWIFT_PLUS_CURRENT}"
+		;;
+	esac
+	# chain remaining commands
+	call_remaining_next_subcommands "$@"
+	status=$?
+	[[ ! -f main ]] || rm main
+	exit "${status}"
+}
+
+function swift-wasmkit-cli() { swift-exec-wasi "$@"; }
+function swift-wasmtime() { swift-exec-wasi "$@"; }
+function swift-wazero() { swift-exec-wasi "$@"; }
+
+####################################################################################################
+# Dispatch
+####################################################################################################
+
+# check if the function exists with same name as the command
+command=$(basename "${0}")
+{ command_type=$(type -t "${command}") && [[ ${command_type} == function ]]; } || error_exit "${0}" "dispatch error for ${command}"
+
+SWIFT_PLUS_CURRENT=$(subcommand_from_path "${0}")
+"${command}" "$@"
