@@ -112,7 +112,7 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,t
 
     # - Download the GPG keys, Swift toolchain, and toolchain signature, and verify.
     export GNUPGHOME=.
-    curl -fLsS https://swift.org/keys/all-keys.asc | gpg --import --quiet - >/dev/null
+    curl -fLsS --compressed https://swift.org/keys/all-keys.asc | gpg --import --quiet - >/dev/null
     curl -fLsS "${download_url_base}/${download}" -O "${download_url_base}/${download_signature}" -O
     gpg --batch --quiet --verify "${download_signature}" "${download}" >/dev/null
     apt-get-update purge --auto-remove -qq curl gnupg2 >/dev/null
