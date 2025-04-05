@@ -9,7 +9,7 @@ Usage: swift + [subcommand ...] [options for swift]
 # Subcommands:
     +         Entry point. Supports --install-shortcuts, --list-commands options.
     exec      Execute code with swift, swiftc, or WASI runtimes.
-    swiftc    Compile code with swiftc and generate the main executable.
+    swiftc    Compile code with swiftc to generate the main executable.
     testing   Prepare stdin code for swift-testing. Uses swiftc automatically.
     time      Use time(1) to measure execution of main, swift, swiftc, or WASI runtimes.
 
@@ -44,15 +44,15 @@ Usage: swift + [subcommand ...] [options for swift]
 
 ## Compile the code with SwiftWasm SDK and execute it with wasmkit-cli
 
-    echo 'print("Hello, WASI!")' | swift + wasi -
+echo 'print("Hello, WASI!")' | swift + wasi -
 
 ## Compile the test code using swift-testing and execute it
 
-    echo '
-    @Test func helloWorld() {
-        let greeting = "Hello, world!"
-        #expect(greeting == "Hello") // Expectation failed: (greeting → "Hello, world!") == "Hello"
-    }' | swift + testing -
+echo '
+@Test func helloWorld() {
+    let greeting = "Hello, world!"
+    #expect(greeting == "Hello") // Expectation failed: (greeting → "Hello, world!") == "Hello"
+}' | swift + testing -
 
 EOF
 }
@@ -269,7 +269,6 @@ function use_darwin_sdk() {
 
 	export USE_SWIFT_TARGET_TRIPLE=${target_triple}
 	call_next_subcommands "${swift_args_for_sdk[@]}" "$@"
-
 }
 
 ####################################################################################################
@@ -320,14 +319,14 @@ function swift-args-for-sdk() {
 		for toolsetPath in $(jq --raw-output '.toolsetPaths[]' <<<"${sdk_configuration}"); do
 			# shellcheck disable=SC2310
 			jq --raw-output --arg toolsetDir "$(dirname "${toolsetPath}")" '
-            "\($toolsetDir)/\(.rootPath // ".")" as $rootPath
-            | (.linker?.path|select(.)|"-ld-path=\($rootPath)/\(.)")
-            , ("-tools-directory",$rootPath|("-Xfrontend",.))
-            , (.swiftCompiler?.extraCLIOptions[]?)
-            , (.cCompiler?.extraCLIOptions[]?|("-Xcc",.))
-            , (.cxxCompiler?.extraCLIOptions[]?|("-Xcxx",.))
-            , (.linker?.extraCLIOptions[]?|("-Xlinker",.))
-        ' "${toolsetPath}" || error_exit "${FUNCNAME[0]}" "Failed to parse ${toolsetPath}"
+				"\($toolsetDir)/\(.rootPath // ".")" as $rootPath
+				| (.linker?.path|select(.)|"-ld-path=\($rootPath)/\(.)")
+				, ("-tools-directory",$rootPath|("-Xfrontend",.))
+				, (.swiftCompiler?.extraCLIOptions[]?)
+				, (.cCompiler?.extraCLIOptions[]?|("-Xcc",.))
+				, (.cxxCompiler?.extraCLIOptions[]?|("-Xcxx",.))
+				, (.linker?.extraCLIOptions[]?|("-Xlinker",.))
+			' "${toolsetPath}" || error_exit "${FUNCNAME[0]}" "Failed to parse ${toolsetPath}"
 		done
 	) || error_exit "${FUNCNAME[0]}" "Failed to parse toolsetPaths"
 	while read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${flags_from_toolsets}"
@@ -336,11 +335,11 @@ function swift-args-for-sdk() {
 
 	flags_from_sdk_configuration=$(
 		jq --raw-output --arg resourcePathKey "swift${isStatic:-}ResourcesPath" '
-        (.includeSearchPaths[]?|("-I",.))
-        , (.librarySearchPaths[]?|("-L",.))
-        , (.sdkRootPath|select(.)|("-sdk",.),("-isysroot",.|("-Xclang-linker",.)))
-        , (.[$resourcePathKey]|select(.)|("-resource-dir","\(.)/clang"|("-Xclang-linker",.)),("-resource-dir",.))
-    ' <<<"${sdk_configuration}"
+			(.includeSearchPaths[]?|("-I",.))
+			, (.librarySearchPaths[]?|("-L",.))
+			, (.sdkRootPath|select(.)|("-sdk",.),("-isysroot",.|("-Xclang-linker",.)))
+			, (.[$resourcePathKey]|select(.)|("-resource-dir","\(.)/clang"|("-Xclang-linker",.)),("-resource-dir",.))
+		' <<<"${sdk_configuration}"
 	) || error_exit "${FUNCNAME[0]}" "Failed to parse SDK configuration"
 	while read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${flags_from_sdk_configuration}"
 
@@ -406,8 +405,8 @@ function swift-sdk-configuration() {
 		jsons=(~/{.swiftpm,Library/org.swift.swiftpm}/swift-sdks/*/info.json)
 		[[ ${#jsons[@]} -ne 0 ]] || error_exit "${FUNCNAME[0]}" "No info.json files found in swift-sdks"
 		jq --raw-output '
-		.artifacts|to_entries[]|.key as $sdk_id|.value|.variants[]|{((input_filename|sub("[^/]+$";""))+.path+"/swift-sdk.json"): $sdk_id}
-	' "${jsons[@]}" | jq --slurp 'add' # use separated jq to avoid incorrect input_filename with --slurp
+			.artifacts|to_entries[]|.key as $sdk_id|.value|.variants[]|{((input_filename|sub("[^/]+$";""))+.path+"/swift-sdk.json"): $sdk_id}
+		' "${jsons[@]}" | jq --slurp 'add' # use separated jq to avoid incorrect input_filename with --slurp
 	)
 	swift_sdk_jsons_list=$(jq -r 'keys[]' <<<"${swift_sdk_json_to_sdk_id}")
 	while read -r line; do swift_sdk_jsons+=("${line}"); done <<<"${swift_sdk_jsons_list}"
@@ -416,24 +415,24 @@ function swift-sdk-configuration() {
 	# { target_triple: { sdk_id: sdk_configuration } }
 	sdk_configurations=$(
 		jq --argjson sdk_ids "${swift_sdk_json_to_sdk_id}" '
-        .targetTriples|map_values(.root = (input_filename|rtrimstr("swift-sdk.json")))|map_values({($sdk_ids[input_filename]):.})
-    ' "${swift_sdk_jsons[@]}" | jq --slurp '
-		map(to_entries[])|reduce .[] as $x ({}; .[$x.key] += $x.value)
-	' # use separated jq to avoid incorrect input_filename with --slurp
+			.targetTriples|map_values(.root = (input_filename|rtrimstr("swift-sdk.json")))|map_values({($sdk_ids[input_filename]):.})
+		' "${swift_sdk_jsons[@]}" | jq --slurp '
+			map(to_entries[])|reduce .[] as $x ({}; .[$x.key] += $x.value)
+		' # use separated jq to avoid incorrect input_filename with --slurp
 	)
 	# { target_triple: { sdk_id: sdk_configuration } } || { sdk_id: sdk_configuration } || sdk_configuration
 	sdk_configuration=$(
 		jq --exit-status --raw-output --arg target_triple "${target_triple}" --arg sdk_id "${sdk_id}" '
-		def match_keys($key): if $key|length then if has($key) then .[$key] else with_entries(select(.key|test($key))) end end;
-		def unwrap_if_one: if length == 1 then [.[]]|first else . end;
-		map_values(map_values(
-			.root as $root
-			| (.sdkRootPath,.swiftResourcesPath,.swiftStaticResourcesPath|select(type == "string")) |= $root + .
-			| (.includeSearchPaths,.librarySearchPaths,.toolsetPaths|select(type == "array")[]) |= $root + .
-			| del(.root)
-		))
-		| match_keys($target_triple) | map_values(match_keys($sdk_id)) | with_entries(select(.value|length)) | unwrap_if_one | unwrap_if_one
-	' <<<"${sdk_configurations}"
+			def match_keys($key): if $key|length then if has($key) then .[$key] else with_entries(select(.key|test($key))) end end;
+			def unwrap_if_one: if length == 1 then [.[]]|first else . end;
+			map_values(map_values(
+				.root as $root
+				| (.sdkRootPath,.swiftResourcesPath,.swiftStaticResourcesPath|select(type == "string")) |= $root + .
+				| (.includeSearchPaths,.librarySearchPaths,.toolsetPaths|select(type == "array")[]) |= $root + .
+				| del(.root)
+			))
+			| match_keys($target_triple) | map_values(match_keys($sdk_id)) | with_entries(select(.value|length)) | unwrap_if_one | unwrap_if_one
+		' <<<"${sdk_configurations}"
 	) || error_exit "${FUNCNAME[0]}" "Failed to get configuration for target_triple: '${target_triple}', sdk_id: '${sdk_id}'"
 
 	jq <<<"${sdk_configuration}"
@@ -534,6 +533,8 @@ function swift-time() {
 
 # prints the deployment target for the given target triple and platform name
 function swift-darwin-deployment-target() {
+	command -v jq &>/dev/null || error_exit "${FUNCNAME[0]}" "jq is required"
+
 	target_triple=${1:-} darwin_platform_name=${2:-}
 	[[ -n ${target_triple} ]] || error_exit "${FUNCNAME[0]}" "missing target_triple"
 
@@ -545,9 +546,9 @@ function swift-darwin-deployment-target() {
 	[[ -f ${sdk_settings} ]] || error_exit "${FUNCNAME[0]}" "SDKSettings.json not found in ${sdk_root_path}"
 	darwin_deployment_target=$(
 		jq --raw-output --argjson darwin "{${darwin_platform_name:+\"platform_name\":\"${darwin_platform_name}\"}}" '
-        ($darwin.platform_name // .DefaultProperties.PLATFORM_NAME) as $darwin_platform_name
-        |.SupportedTargets[$darwin_platform_name].DefaultDeploymentTarget
-    ' "${sdk_settings}"
+            ($darwin.platform_name // .DefaultProperties.PLATFORM_NAME) as $darwin_platform_name
+            |.SupportedTargets[$darwin_platform_name].DefaultDeploymentTarget
+        ' "${sdk_settings}"
 	) || error_exit "${FUNCNAME[0]}" "Failed to get deployment target for ${darwin_platform_name}"
 	echo "${darwin_deployment_target}"
 }
@@ -578,7 +579,9 @@ function swift-musl() {
 	# shellcheck disable=SC2310
 	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
 
-	target_triple="$(arch)-swift-linux-musl"
+	linux_arch=$(arch)
+	linux_arch=${linux_arch/arm64/aarch64}
+	target_triple="${linux_arch}-swift-linux-musl"
 	export USE_SWIFT_TARGET_TRIPLE=${target_triple}
 	call_next_subcommands "$@"
 }
