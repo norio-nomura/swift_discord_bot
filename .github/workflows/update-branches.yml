@@ -23,8 +23,6 @@ jobs:
         repository: ["library/swift"]
         tag: [""]
         include:
-          - id: '6.1'
-            swift_webroot: 'https://download.swift.org/swift-6.1-branch/ubuntu2204'
           - id: 'main'
             swift_webroot: 'https://download.swift.org/development/ubuntu2204'
 
