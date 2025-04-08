@@ -6,16 +6,20 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /
     envVars:
+      # build time args
+      - key: DOCKER_IMAGE
+        value: swift
+      - key: SWIFT_WEBROOT
+        value: https://download.swift.org/development
+      - key: USE_SNAPSHOT
+        value: false
+      # runtime environment variables
       - key: DISCORD_NICKNAME
         sync: false
       - key: DISCORD_PLAYING
         sync: false
       - key: DISCORD_TOKEN
         sync: false
-      - key: DOCKER_IMAGE
-        sync: false
       - key: GITHUB_TOKEN
-        sync: false
-      - key: SWIFT_WEBROOT
         sync: false
     autoDeploy: false

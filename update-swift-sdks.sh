@@ -13,8 +13,11 @@ done
 gh extension install norio-nomura/gh-query-tags 2>/dev/null
 
 function detect_swift_snapshot_version() {
-	local dockerfile="Dockerfile" SWIFT_WEBROOT="${1}" SWIFT_PLATFORM PLATFORM_CODENAME OS_MAJOR_VER OS_MIN_VER OS_ARCH_SUFFIX arch latest_build_yml_url
+	local dockerfile="Dockerfile" render_yaml="${1}" SWIFT_WEBROOT SWIFT_PLATFORM PLATFORM_CODENAME OS_MAJOR_VER OS_MIN_VER OS_ARCH_SUFFIX arch latest_build_yml_url
 
+	SWIFT_WEBROOT="$(yq eval '
+		.services[0]|.envVars|map(select(.key == "SWIFT_WEBROOT"))[0]|.value // "https://download.swift.org/development"
+	' "${render_yaml}")"
 	SWIFT_PLATFORM="$(sed -n -E 's/^ARG SWIFT_PLATFORM=(.*)$/\1/p' "${dockerfile}")"
 	PLATFORM_CODENAME="$(sed -n -E 's/^ARG PLATFORM_CODENAME=(.*)$/\1/p' "${dockerfile}")"
 	OS_MAJOR_VER=${PLATFORM_CODENAME}
@@ -51,15 +54,18 @@ function detect_swift_release_version() {
 }
 
 function detect_swift_version_from_render_yaml() {
-	local render_yaml="${1}" SWIFT_WEBROOT
-	SWIFT_WEBROOT="$(yq eval '.services[0]|.envVars|map(select(.key == "SWIFT_WEBROOT"))[0]|.value' "${render_yaml}")"
-	if [[ ${SWIFT_WEBROOT} != "null" ]]; then
+	local render_yaml="${1}"
+	USE_SNAPSHOT="$(yq eval '.services[0]|.envVars|map(select(.key == "USE_SNAPSHOT"))[0]|.value' "${render_yaml}")"
+	case "${USE_SNAPSHOT}" in
+	"ON" | "on" | "TRUE" | "true" | "YES" | "yes" | "1")
 		# swift-(\d+\.\d+-)?DEVELOPMENT-SNAPSHOT-\d+-\d+-\d+-a
-		detect_swift_snapshot_version "${SWIFT_WEBROOT}"
-	else
+		detect_swift_snapshot_version "${render_yaml}"
+		;;
+	*)
 		# swift-\d+\.\d+(.\d+)?-RELEASE
 		detect_swift_release_version "${render_yaml}"
-	fi
+		;;
+	esac
 }
 
 function swift_tag_patterns_from_swift_version() {
@@ -163,22 +169,4 @@ SWIFT_SDKS="$(
 	print_swiftwasm_sdk_hash_and_url "${SWIFT_VERSION}"
 )"
 
-echo "${SWIFT_SDKS}"
-
-# Update SWIFT_SDKS in docker-compose.yml
-yq -i e '
-	setpath(
-		.services.observant.build.args|path + ["SWIFT_SDKS"];
-		"'"${SWIFT_SDKS}"'"
-	) style="literal"
-	| .services.observant.build.args |= sort_keys(.)
-' docker-compose.yml
-
-# Update SWIFT_SDKS in render.yaml
-yq -i e '
-	setpath(
-		.services[0].envVars|(.[]|select(.key|test("SWIFT_SDKS"))|path) // path+[length];
-		{"key": "SWIFT_SDKS", "value": "'"${SWIFT_SDKS}"'"}
-	) style="literal"
-	|.services[0].envVars |= sort_by(.key)
-' "${render_yaml}"
+echo "${SWIFT_SDKS}" | tee swift-sdks.txt

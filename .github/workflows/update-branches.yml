@@ -85,7 +85,7 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           ./update-swift-sdks.sh
-          git add docker-compose.yml render.yaml
+          git add swift-sdks.txt
           if ! git diff --cached --quiet; then
             commit_message="Update Swift SDKs"
             last_commit_subject=$(git log -1 --pretty=%s)

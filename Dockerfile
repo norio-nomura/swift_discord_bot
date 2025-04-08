@@ -14,13 +14,24 @@ ARG OS_MIN_VER=${OS_MIN_VER/noble/04}
 
 ARG SWIFT_VERSION
 ARG DOCKER_IMAGE=swift:${SWIFT_VERSION:+${SWIFT_VERSION}-}${PLATFORM_CODENAME}
-
-ARG SWIFT_WEBROOT
-ARG USE_SNAPSHOT=${SWIFT_WEBROOT:+true}
-# select use-swift-snapshot-image-built-here or use-pre-built-swift-image
-ARG SWIFT_IMAGE_SELECTOR=${USE_SNAPSHOT:+swift-snapshot-image-built-here}
-ARG SWIFT_IMAGE_SELECTOR=${SWIFT_IMAGE_SELECTOR:-pre-built-swift-image}
 ARG SWIFT_WEBROOT=https://download.swift.org/development
+
+# build arg to control whether to use a pre-built image or build the snapshot image here
+ARG USE_SNAPSHOT
+# If empty, treat as false
+ARG _PARSE_USE_SNAPSHOT=${USE_SNAPSHOT:-false}
+# remove truthy values
+ARG _PARSE_USE_SNAPSHOT=${_PARSE_USE_SNAPSHOT#ON}
+ARG _PARSE_USE_SNAPSHOT=${_PARSE_USE_SNAPSHOT#on}
+ARG _PARSE_USE_SNAPSHOT=${_PARSE_USE_SNAPSHOT#TRUE}
+ARG _PARSE_USE_SNAPSHOT=${_PARSE_USE_SNAPSHOT#true}
+ARG _PARSE_USE_SNAPSHOT=${_PARSE_USE_SNAPSHOT#YES}
+ARG _PARSE_USE_SNAPSHOT=${_PARSE_USE_SNAPSHOT#yes}
+ARG _PARSE_USE_SNAPSHOT=${_PARSE_USE_SNAPSHOT#1}
+# if not empty, USE_SNAPSHOT is false, use pre-built image
+ARG SWIFT_IMAGE_SELECTOR=${_PARSE_USE_SNAPSHOT:+pre-built-swift-image}
+# if empty, USE_SNAPSHOT is true, build snapshot image
+ARG SWIFT_IMAGE_SELECTOR=${SWIFT_IMAGE_SELECTOR:-swift-snapshot-image-built-here}
 
 ####################################################################################################
 # helpser scripts
@@ -134,11 +145,12 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,t
 
 # download Swift SDKs
 WORKDIR /swift-sdks
-ARG SWIFT_SDKS
+COPY swift-sdks.txt ./
 RUN <<EOF
-    [ -z "${SWIFT_SDKS:-}" ] || echo "${SWIFT_SDKS}" | while read -r sha256 url; do
-        curl -fLsS "${url}" -O -w "${sha256} %{filename_effective}\n"
-    done | sha256sum --check --strict -
+    cat swift-sdks.txt | while read -r sha256 url; do
+        curl -fLsS "${url}" -O -w "${sha256} %{filename_effective}\n" | sha256sum --check --strict -
+    done
+    rm swift-sdks.txt
 EOF
 
 ####################################################################################################
