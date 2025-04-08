@@ -91,6 +91,7 @@ EOF
 ####################################################################################################
 FROM ${PLATFORM_IMAGE} AS swift-toolchain-downloader
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
+ARG TARGETARCH
 
 # install /usr/local/bin/apt-get-update script
 COPY --from=apt-get-update /* /usr/local/bin/
@@ -102,7 +103,7 @@ ARG OS_MIN_VER #=04
 ARG SWIFT_WEBROOT #=https://download.swift.org/development
 
 WORKDIR /swift-toolchain
-RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt <<EOF
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} <<EOF
     case $(arch) in
     x86_64) OS_ARCH_SUFFIX='' ;;
     aarch64) OS_ARCH_SUFFIX='-aarch64' ;;
@@ -135,12 +136,13 @@ EOF
 ####################################################################################################
 FROM ${PLATFORM_IMAGE} AS swift-sdks-downloader
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
+ARG TARGETARCH
 
 # install /usr/local/bin/apt-get-update script
 COPY --from=apt-get-update /* /usr/local/bin/
 
 # install apt dependencies
-RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} \
     apt-get-install ca-certificates curl
 
 # download Swift SDKs
@@ -158,6 +160,7 @@ EOF
 ####################################################################################################
 FROM ${DOCKER_IMAGE} AS use-pre-built-swift-image
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
+ARG TARGETARCH
 
 # install /usr/local/bin/apt-get-update script
 COPY --from=apt-get-update /* /usr/local/bin/
@@ -175,7 +178,7 @@ SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
 COPY --from=apt-get-update /* /usr/local/bin/
 
 # install apt dependencies
-RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} \
     apt-get-install \
     binutils \
     git \
@@ -219,12 +222,13 @@ RUN echo "[ -n \"\${TERM:-}\" -a -r /etc/motd ] && cat /etc/motd" >> /etc/bash.b
 ####################################################################################################
 FROM swift:${PLATFORM_CODENAME} AS wasmkit-builder
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
+ARG TARGETARCH
 
 # install /usr/local/bin/apt-get-update script
 COPY --from=apt-get-update /* /usr/local/bin/
 
 # install curl and jq
-RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} \
     apt-get-install ca-certificates curl jq
 
 # install yq
@@ -284,11 +288,11 @@ USER root
 WORKDIR /usr/local/bin
 
 # install apt dependencies
-RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} \
     apt-get-install ca-certificates curl file jq time unzip xz-utils
 
 # install llvm-symbolizer
-RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt <<'EOF'
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} <<'EOF'
     # Use apt-patterns(7) to search llvm-[0-9]+ package that is depended by llvm package
     apt_patterns_for_llvm='?and(?reverse-depends(?exact-name(llvm)),?name(llvm-[0-9]+))'
 
@@ -314,7 +318,7 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,t
 EOF
 
 # install gh
-RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt \
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} \
     --mount=type=bind,from=install-gh,source=/install-gh,target=/usr/local/bin/install-gh \
     install-gh
 
@@ -369,7 +373,7 @@ USER root
 COPY --from=apt-get-update /* /usr/local/bin/
 
 # Setup for debugging in VSCode
-RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,sharing=locked,target=/var/lib/apt <<EOF
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} <<EOF
     # Install git and sudo
     apt-get-install git shellcheck shfmt sudo
 
