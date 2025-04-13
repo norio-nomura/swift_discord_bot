@@ -1,0 +1,2 @@
+67f765e0030e661a7450f7e4877cfe008db4f57f177d5a08a6e26fd661cdd0bd https://download.swift.org/swift-6.0.3-release/static-sdk/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz
+f279dc54f25422a3e7355be63bd2729b333d015871e40923ef86879de4161199 https://github.com/swiftwasm/swift/releases/download/swift-wasm-6.0-SNAPSHOT-2025-05-28-a/swift-wasm-6.0-SNAPSHOT-2025-05-28-a-wasm32-unknown-wasi.artifactbundle.zip
