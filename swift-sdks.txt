@@ -1,0 +1,2 @@
+9592e7d7d94b5edbe5c88e39ccc554d2bb1e814f05e3d260a684328a5887913c https://download.swift.org/development/static-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-06-12-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-12-a_static-linux-0.0.1.artifactbundle.tar.gz
+dfba0e1f123c55a55ff5c9c12b7c978299cbbdca5519423dffa2c775857720e5 https://download.swift.org/development/wasm-sdk/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a/swift-DEVELOPMENT-SNAPSHOT-2025-06-22-a_wasm.artifactbundle.tar.gz
