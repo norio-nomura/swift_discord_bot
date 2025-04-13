@@ -1,1 +1,3 @@
+67f765e0030e661a7450f7e4877cfe008db4f57f177d5a08a6e26fd661cdd0bd https://download.swift.org/swift-6.0.3-release/static-sdk/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz
+ce1e41f0750e3f1d2ce10ad8e4ea304c3295f0a2adc252b79e9cacf9eae211db https://github.com/swiftwasm/swift/releases/download/swift-wasm-6.0-SNAPSHOT-2025-04-17-a/swift-wasm-6.0-SNAPSHOT-2025-04-17-a-wasm32-unknown-wasi.artifactbundle.zip
 75696c64d8dbddb125a4d3294db8f0010d10f3d524866b6ad758c871846f3835 https://github.com/kabiroberai/swift-sdk-darwin/releases/download/1.3.1/darwin-linux-aarch64.artifactbundle.zip
