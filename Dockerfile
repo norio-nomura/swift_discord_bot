@@ -141,18 +141,17 @@ ARG TARGETARCH
 # install /usr/local/bin/apt-get-update script
 COPY --from=apt-get-update /* /usr/local/bin/
 
-# install apt dependencies
-RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} \
-    apt-get-install ca-certificates curl
-
 # download Swift SDKs
 WORKDIR /swift-sdks
 COPY swift-sdks.txt ./
-RUN <<EOF
-    cat swift-sdks.txt | while read -r sha256 url; do
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} <<EOF
+    swift_sdks_txt=$(cat swift-sdks.txt)
+    rm swift-sdks.txt
+    [ -z "${swift_sdks_txt}" ] && exit
+    apt-get-install ca-certificates curl
+    echo -n "${swift_sdks_txt}" | while read -r sha256 url; do
         curl -fLsS "${url}" -O -w "${sha256} %{filename_effective}\n" | sha256sum --check --strict -
     done
-    rm swift-sdks.txt
 EOF
 
 ####################################################################################################
