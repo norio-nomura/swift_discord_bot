@@ -4,10 +4,14 @@ ARG PLATFORM_CODENAME=noble
 ARG PLATFORM_IMAGE=${SWIFT_PLATFORM}:${PLATFORM_CODENAME}
 
 ARG OS_MAJOR_VER=${PLATFORM_CODENAME}
+ARG OS_MAJOR_VER=${OS_MAJOR_VER/xenial/16}
+ARG OS_MAJOR_VER=${OS_MAJOR_VER/bionic/18}
 ARG OS_MAJOR_VER=${OS_MAJOR_VER/focal/20}
 ARG OS_MAJOR_VER=${OS_MAJOR_VER/jammy/22}
 ARG OS_MAJOR_VER=${OS_MAJOR_VER/noble/24}
 ARG OS_MIN_VER=${PLATFORM_CODENAME}
+ARG OS_MIN_VER=${OS_MIN_VER/xenail/04}
+ARG OS_MIN_VER=${OS_MIN_VER/bionic/04}
 ARG OS_MIN_VER=${OS_MIN_VER/focal/04}
 ARG OS_MIN_VER=${OS_MIN_VER/jammy/04}
 ARG OS_MIN_VER=${OS_MIN_VER/noble/04}
@@ -93,11 +97,20 @@ EOF
 FROM scratch AS install-gh
 COPY --chmod=755 <<'EOF' install-gh
 #!/bin/bash -eu
-    keyring=/etc/apt/keyrings/githubcli-archive-keyring.gpg
-    packages_url="https://cli.github.com/packages"
-    [[ -f ${keyring} ]] || curl -fLsS "${packages_url}/$(basename "${keyring}")" -o "${keyring}" --create-dirs
     list=/etc/apt/sources.list.d/github-cli.list
-    [[ -f ${list} ]] || echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] ${packages_url} stable main" >"${list}"
+    packages_url="https://cli.github.com/packages"
+    distrib_release=$(source /etc/lsb-release && echo "${DISTRIB_RELEASE%.*}")
+    if [[ $distrib_release -ge 22 ]]; then
+        keyring=/etc/apt/keyrings/githubcli-archive-keyring.gpg
+        [[ -f ${keyring} ]] || curl -fLsS "${packages_url}/$(basename "${keyring}")" -o "${keyring}" --create-dirs
+        [[ -f ${list} ]] || echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] ${packages_url} stable main" >"${list}"
+    else
+        # older versions of Ubuntu need this
+        apt-get-install apt-transport-https
+        # use apt-key for older versions of Ubuntu
+        apt-key adv --keyserver keyserver.ubuntu.com --recv-key 23F3D4EA75716059
+        [[ -f ${list} ]] || echo "deb [arch=$(dpkg --print-architecture)] ${packages_url} stable main" >"${list}"
+    fi
     apt-get-install gh
     gh --version
 EOF
