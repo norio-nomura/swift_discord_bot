@@ -4,10 +4,14 @@ ARG PLATFORM_CODENAME=noble
 ARG PLATFORM_IMAGE=${SWIFT_PLATFORM}:${PLATFORM_CODENAME}
 
 ARG OS_MAJOR_VER=${PLATFORM_CODENAME}
+ARG OS_MAJOR_VER=${OS_MAJOR_VER/xenial/16}
+ARG OS_MAJOR_VER=${OS_MAJOR_VER/bionic/18}
 ARG OS_MAJOR_VER=${OS_MAJOR_VER/focal/20}
 ARG OS_MAJOR_VER=${OS_MAJOR_VER/jammy/22}
 ARG OS_MAJOR_VER=${OS_MAJOR_VER/noble/24}
 ARG OS_MIN_VER=${PLATFORM_CODENAME}
+ARG OS_MIN_VER=${OS_MIN_VER/xenail/04}
+ARG OS_MIN_VER=${OS_MIN_VER/bionic/04}
 ARG OS_MIN_VER=${OS_MIN_VER/focal/04}
 ARG OS_MIN_VER=${OS_MIN_VER/jammy/04}
 ARG OS_MIN_VER=${OS_MIN_VER/noble/04}
@@ -32,6 +36,22 @@ ARG _PARSE_USE_SNAPSHOT=${_PARSE_USE_SNAPSHOT#1}
 ARG SWIFT_IMAGE_SELECTOR=${_PARSE_USE_SNAPSHOT:+pre-built-swift-image}
 # if empty, USE_SNAPSHOT is true, build snapshot image
 ARG SWIFT_IMAGE_SELECTOR=${SWIFT_IMAGE_SELECTOR:-swift-snapshot-image-built-here}
+
+# build arg to control whether to use swift sdks or not
+ARG USE_SWIFT_SDKS
+ARG _PARSE_USE_SWIFT_SDKS=${USE_SWIFT_SDKS:-false}
+# remove truthy values
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#ON}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#on}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#TRUE}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#true}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#YES}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#yes}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#1}
+# if not empty, USE_SWIFT_SDKS is false, do not install swift sdks
+ARG SWIFT_SDKS_SELECTOR=${_PARSE_USE_SWIFT_SDKS:+dependencies}
+# if empty, USE_SWIFT_SDKS is true, install swift sdks
+ARG SWIFT_SDKS_SELECTOR=${SWIFT_SDKS_SELECTOR:-swift-sdks}
 
 ####################################################################################################
 # helpser scripts
@@ -77,11 +97,20 @@ EOF
 FROM scratch AS install-gh
 COPY --chmod=755 <<'EOF' install-gh
 #!/bin/bash -eu
-    keyring=/etc/apt/keyrings/githubcli-archive-keyring.gpg
-    packages_url="https://cli.github.com/packages"
-    [[ -f ${keyring} ]] || curl -fLsS "${packages_url}/$(basename "${keyring}")" -o "${keyring}" --create-dirs
     list=/etc/apt/sources.list.d/github-cli.list
-    [[ -f ${list} ]] || echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] ${packages_url} stable main" >"${list}"
+    packages_url="https://cli.github.com/packages"
+    distrib_release=$(source /etc/lsb-release && echo "${DISTRIB_RELEASE%.*}")
+    if [[ $distrib_release -ge 22 ]]; then
+        keyring=/etc/apt/keyrings/githubcli-archive-keyring.gpg
+        [[ -f ${keyring} ]] || curl -fLsS "${packages_url}/$(basename "${keyring}")" -o "${keyring}" --create-dirs
+        [[ -f ${list} ]] || echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] ${packages_url} stable main" >"${list}"
+    else
+        # older versions of Ubuntu need this
+        apt-get-install apt-transport-https
+        # use apt-key for older versions of Ubuntu
+        apt-key adv --keyserver keyserver.ubuntu.com --recv-key 23F3D4EA75716059
+        [[ -f ${list} ]] || echo "deb [arch=$(dpkg --print-architecture)] ${packages_url} stable main" >"${list}"
+    fi
     apt-get-install gh
     gh --version
 EOF
@@ -141,18 +170,17 @@ ARG TARGETARCH
 # install /usr/local/bin/apt-get-update script
 COPY --from=apt-get-update /* /usr/local/bin/
 
-# install apt dependencies
-RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} \
-    apt-get-install ca-certificates curl
-
 # download Swift SDKs
 WORKDIR /swift-sdks
 COPY swift-sdks.txt ./
-RUN <<EOF
-    cat swift-sdks.txt | while read -r sha256 url; do
+RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} <<EOF
+    swift_sdks_txt=$(cat swift-sdks.txt)
+    rm swift-sdks.txt
+    [ -z "${swift_sdks_txt}" ] && exit
+    apt-get-install ca-certificates curl
+    echo -n "${swift_sdks_txt}" | while read -r sha256 url; do
         curl -fLsS "${url}" -O -w "${sha256} %{filename_effective}\n" | sha256sum --check --strict -
     done
-    rm swift-sdks.txt
 EOF
 
 ####################################################################################################
@@ -173,6 +201,7 @@ FROM ${PLATFORM_IMAGE} AS use-swift-snapshot-image-built-here
 # LABEL maintainer="Swift Infrastructure <swift-infrastructure@forums.swift.org>"
 # LABEL description="Docker Container for the Swift programming language"
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
+ARG TARGETARCH
 
 # install /usr/local/bin/apt-get-update script
 COPY --from=apt-get-update /* /usr/local/bin/
@@ -234,27 +263,9 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --m
 # install yq
 COPY --from=mikefarah/yq /usr/bin/yq /usr/local/bin/
 
-# install static linux sdk
-RUN --mount=type=bind,from=swift-sdks-downloader,source=/swift-sdks,target=/swift-sdks <<'EOF'
-    swift_tag=$(swift --version | jq -eRr 'capture("(?<v>swift-\\d+\\.\\d(\\.\\d+)?-RELEASE)")|.v')
-    swift_releases_yml_url="https://github.com/swiftlang/swift-org-website/raw/refs/heads/main/_data/builds/swift_releases.yml"
-    swift_releases_json=$(curl -fLsS "${swift_releases_yml_url}" -o - | yq -o=json -)
-    checksum_and_artifact_url=$(
-        jq --raw-output --arg tag "${swift_tag}" '
-            reverse|map(select(.tag == $tag))|first
-            |.platforms|map(select(.platform == "static-sdk"))|first
-            |"\(.checksum) https://download.swift.org/\($tag|ascii_downcase)/static-sdk/\($tag)/\($tag)_static-linux-0.0.1.artifactbundle.tar.gz"
-            // empty
-        ' <<<"${swift_releases_json}"
-    )
-    read -r checksum artifact_url <<<"${checksum_and_artifact_url}"
-    [[ ! -f "/swift-sdks/$(basename "${artifact_url}")" ]] || artifact_url="/swift-sdks/$(basename "${artifact_url}")"
-    swift sdk install --checksum "${checksum}" "${artifact_url}" >/dev/null
-EOF
-
 ARG WASMKIT_BUILDER=/wasmkit-builder
 WORKDIR ${WASMKIT_BUILDER}
-RUN --mount=type=tmpfs,target=${WASMKIT_BUILDER} --mount=type=cache,target=${WASMKIT_BUILDER}/.build <<'EOF'
+RUN --mount=type=cache,target=/root/.cache --mount=type=tmpfs,target=${WASMKIT_BUILDER} --mount=type=cache,target=${WASMKIT_BUILDER}/.build <<'EOF'
     # detect the latest wasmkit release tag
     tag=$(curl -fLsS "https://github.com/swiftwasm/wasmkit/releases/latest" -H'Accept: application/json' | jq -r .tag_name)
 
@@ -262,7 +273,6 @@ RUN --mount=type=tmpfs,target=${WASMKIT_BUILDER} --mount=type=cache,target=${WAS
     curl -fLsS "https://github.com/swiftwasm/wasmkit/archive/refs/tags/${tag}.tar.gz" | tar zxf - --no-same-owner --strip-component=1
 
     # build wasmkit-cli
-    # BUILD_FLAGS=(--swift-sdk "$(arch)-swift-linux-musl" -Xlinker -strip-all -c release --product wasmkit-cli)
     BUILD_FLAGS=(--static-swift-stdlib -c release --product wasmkit-cli)
     swift build "${BUILD_FLAGS[@]}"
     install -D -t /usr/bin "$(swift build --show-bin-path "${BUILD_FLAGS[@]}")/wasmkit-cli"
@@ -278,13 +288,7 @@ FROM use-${SWIFT_IMAGE_SELECTOR} AS prepare-dependencies
 ARG USERNAME=bot
 RUN mkdir -p /etc/skel/.cache/deno && useradd -m $USERNAME
 
-# Install SwiftSDKs on the bot user
-USER $USERNAME
-RUN --mount=type=bind,from=swift-sdks-downloader,source=/swift-sdks,target=/swift-sdks \
-    find /swift-sdks -type f | xargs -n 1 -r swift sdk install
-
 # install tools
-USER root
 WORKDIR /usr/local/bin
 
 # install apt dependencies
@@ -293,6 +297,13 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --m
 
 # install llvm-symbolizer
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} <<'EOF'
+    # Check apt version
+    distrib_release=$(source /etc/lsb-release && echo "${DISTRIB_RELEASE%.*}")
+    [[ $distrib_release -ge 22 ]] || {
+        echo >&2 "Skip llvm-symbolizer installation, since apt-patterns does not support 'reverse-depends'"
+        exit 0
+    }
+
     # Use apt-patterns(7) to search llvm-[0-9]+ package that is depended by llvm package
     apt_patterns_for_llvm='?and(?reverse-depends(?exact-name(llvm)),?name(llvm-[0-9]+))'
 
@@ -332,11 +343,28 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
     deno --version
 EOF
 
+# install swift-* wrapper scripts
+COPY --chmod=755 swift-wrappers/swift-+ /usr/bin/
+
+# create symbolic links to swift-+
+RUN /usr/bin/swift-+ --install-shortcuts
+
+####################################################################################################
+# prepare-swift-sdks
+####################################################################################################
+FROM prepare-dependencies AS prepare-swift-sdks
+
+USER root
+WORKDIR /usr/local/bin
+
 # install wasmer
 RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
     github-release-artifact-with-pattern "wasmerio/wasmer" 'linux-'"$(arch)"'.tar.gz$' v6.0.0-alpha.2 | tar xzf - --directory .. --no-same-owner
     wasmer-headless --version
 EOF
+
+# install wasmkit-cli
+COPY --from=wasmkit-builder /usr/bin/wasmkit-cli /usr/local/bin/
 
 # install wasmtime
 RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
@@ -350,22 +378,15 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
     wazero version
 EOF
 
-# install wasmkit-cli
-COPY --from=wasmkit-builder /usr/bin/wasmkit-cli /usr/local/bin/
-
-# install swift-* wrapper scripts
-COPY --chmod=755 swift-wrappers/swift-+ /usr/bin/
-
-# create symbolic links to swift-+
-RUN /usr/bin/swift-+ --install-shortcuts
-
-# use the bot user
+# Install SwiftSDKs on the bot user
 USER $USERNAME
+RUN --mount=type=bind,from=swift-sdks-downloader,source=/swift-sdks,target=/swift-sdks \
+    find /swift-sdks -type f | xargs -n 1 -r swift sdk install
 
 ####################################################################################################
 # development stage for developing bot in devcontainer on VSCode
 ####################################################################################################
-FROM prepare-dependencies AS debugger
+FROM prepare-${SWIFT_SDKS_SELECTOR} AS debugger
 
 ARG DEBUGGER_USERNAME=debugger
 USER root
@@ -394,7 +415,10 @@ USER ${DEBUGGER_USERNAME}
 ####################################################################################################
 # production stage for running bot on production
 ####################################################################################################
-FROM prepare-dependencies AS production
+FROM prepare-${SWIFT_SDKS_SELECTOR} AS production
+
+# use the bot user
+USER $USERNAME
 
 # Install Bot Source Code
 WORKDIR /bot

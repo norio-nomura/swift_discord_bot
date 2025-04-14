@@ -95,6 +95,14 @@ function is_array() {
 	attribute=$(declare -p "${1}" 2>/dev/null) && [[ ${attribute} == "declare -a ${1}"* ]]
 }
 
+function check_bash_version() {
+	local required=4.4
+	compare_bash_version=$(printf "%s\n%s\n" "${required}" "${BASH_VERSION}" | sort -V | head -n1)
+	if [[ ${compare_bash_version} != "${required}" ]]; then
+		error_exit "${0}" "Bash version ${required} or later is required"
+	fi
+}
+
 ####################################################################################################
 # Subcommand helpers
 ####################################################################################################
@@ -131,7 +139,6 @@ function prepend_next_subcommands() {
 # remove the given command from the next commands
 function remove_from_next_subcommands() {
 	prepare_next_subcommands "$@"
-	# shellcheck disable=SC2206
 	for i in "${!next_subcommands[@]}"; do
 		[[ ${next_subcommands[i]} == "${1}" ]] && unset "next_subcommands[i]" && removed=1
 	done
@@ -208,6 +215,22 @@ function call_command() {
 # misc helpers
 ####################################################################################################
 
+function install_shortcuts() {
+	basename=$(basename "${0}")
+	full_path=$(command -v "${0}")
+	[[ -n ${full_path} ]] || error_exit "${FUNCNAME[0]}" "command not found: ${0}"
+	dir=$(dirname "${full_path}")
+	[[ -d ${dir} ]] || error_exit "${FUNCNAME[0]}" "directory not found: ${dir}"
+	functions=$(declare -F | awk '$3 ~ /^swift-/ {print $3}' | grep -v "${FUNCNAME[0]}" | sort)
+	for command in ${functions}; do
+		[[ -f "${dir}/${command}" ]] || ln -s "${basename}" "${dir}/${command}"
+	done
+}
+
+function list_commands() {
+	declare -F | awk '$3 ~ /^swift-/ {print $3}' | sort
+}
+
 # prepare swift arguments for the sdk and use swiftc if required
 function prepare_swift_args_for_sdk_and_use_swiftc() {
 	local target_triple="${USE_SWIFT_TARGET_TRIPLE:-}"
@@ -227,7 +250,8 @@ function prepare_swift_args_for_sdk_and_use_swiftc() {
 	[[ -n ${USE_SWIFTC:-} ]] && export USE_SWIFTC=1
 	# prepare swift arguments for the sdk
 	declare -g -a swift_args_for_sdk=(-target "${target_triple}")
-	swift_args_for_sdk_output=$(swift-args-for-sdk "${sdk_triple}" "" "$@")
+	# shellcheck disable=SC2310
+	swift_args_for_sdk_output=$(swift-args-for-sdk "${sdk_triple}" "" "$@") || return
 	mapfile -O "${#swift_args_for_sdk[@]}" -t swift_args_for_sdk <<<"${swift_args_for_sdk_output}"
 }
 
@@ -262,9 +286,10 @@ function use_darwin_sdk() {
 	target_triple=${target_triple//\{darwin_arch\}/${darwin_arch}}
 
 	# Detect default deployment target from SDKSettings.json
+	# shellcheck disable=SC2310
 	[[ -z ${darwin_deployment_target:-} ]] && darwin_deployment_target=$(
 		swift-darwin-deployment-target "${sdk_triple}" "${darwin_platform_name:-}"
-	)
+	) || return
 	target_triple=${target_triple//\{darwin_deployment_target\}/${darwin_deployment_target}}
 
 	export USE_SWIFT_TARGET_TRIPLE=${target_triple}
@@ -277,25 +302,6 @@ function use_darwin_sdk() {
 
 # command for the entry point
 function swift-+() {
-	case "${1:-}" in
-	--install-shortcuts)
-		basename=$(basename "${0}")
-		full_path=$(command -v "${0}")
-		[[ -n ${full_path} ]] || error_exit "${FUNCNAME[0]}" "command not found: ${0}"
-		dir=$(dirname "${full_path}")
-		[[ -d ${dir} ]] || error_exit "${FUNCNAME[0]}" "directory not found: ${dir}"
-		functions=$(declare -F | awk '$3 ~ /^swift-/ {print $3}' | grep -v "${FUNCNAME[0]}" | sort)
-		for command in ${functions}; do
-			[[ -f "${dir}/${command}" ]] || ln -s "${basename}" "${dir}/${command}"
-		done
-		exit
-		;;
-	--list-commands)
-		declare -F | awk '$3 ~ /^swift-/ {print $3}' | sort
-		exit
-		;;
-	*) ;;
-	esac
 	# shellcheck disable=SC2310
 	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
 	call_next_subcommands "$@"
@@ -312,7 +318,8 @@ function swift-args-for-sdk() {
 	[[ ${sdk_id} == "-" ]] && sdk_id=""
 	[[ -n ${target_triple} ]] || error_exit "${FUNCNAME[0]}" "missing target_triple"
 
-	sdk_configuration=$(swift-sdk-configuration "${target_triple}" "${sdk_id}")
+	# shellcheck disable=SC2310
+	sdk_configuration=$(swift-sdk-configuration "${target_triple}" "${sdk_id}") || return
 
 	# Build SWIFT_ARGS_FOR_SDK from configuration by jq
 	flags_from_toolsets=$(
@@ -400,6 +407,7 @@ function swift-sdk-configuration() {
 	[[ ${sdk_id} == "-" ]] && sdk_id=""
 
 	# { sdk_json_path: sdk_id }
+	# shellcheck disable=SC2310
 	swift_sdk_json_to_sdk_id=$(
 		shopt -s nullglob
 		jsons=(~/{.swiftpm,Library/org.swift.swiftpm}/swift-sdks/*/info.json)
@@ -407,7 +415,7 @@ function swift-sdk-configuration() {
 		jq --raw-output '
 			.artifacts|to_entries[]|.key as $sdk_id|.value|.variants[]|{((input_filename|sub("[^/]+$";""))+.path+"/swift-sdk.json"): $sdk_id}
 		' "${jsons[@]}" | jq --slurp 'add' # use separated jq to avoid incorrect input_filename with --slurp
-	)
+	) || return
 	swift_sdk_jsons_list=$(jq -r 'keys[]' <<<"${swift_sdk_json_to_sdk_id}")
 	while read -r line; do swift_sdk_jsons+=("${line}"); done <<<"${swift_sdk_jsons_list}"
 	[[ ${#swift_sdk_jsons[@]} -ne 0 ]] || error_exit "${FUNCNAME[0]}" "No swift-sdk.json files found in swift-sdks"
@@ -538,7 +546,8 @@ function swift-darwin-deployment-target() {
 	target_triple=${1:-} darwin_platform_name=${2:-}
 	[[ -n ${target_triple} ]] || error_exit "${FUNCNAME[0]}" "missing target_triple"
 
-	sdk_configuration=$(swift-sdk-configuration "${target_triple}")
+	# shellcheck disable=SC2310
+	sdk_configuration=$(swift-sdk-configuration "${target_triple}") || return
 
 	# Detect deployment target from SDKSettings.json
 	sdk_root_path=$(jq -r '.sdkRootPath' <<<"${sdk_configuration}")
@@ -649,6 +658,19 @@ function swift-wazero() { swift-exec-wasi "$@"; }
 # check if the function exists with same name as the command
 command=$(basename "${0}")
 { command_type=$(type -t "${command}") && [[ ${command_type} == function ]]; } || error_exit "${0}" "dispatch error for ${command}"
+
+[[ ${command} == swift-+* ]] && case "${1:-}" in
+--install-shortcuts)
+	install_shortcuts
+	exit
+	;;
+--list-commands)
+	list_commands
+	exit
+	;;
+*) ;;
+esac
+check_bash_version
 
 SWIFT_PLUS_CURRENT=$(subcommand_from_path "${0}")
 "${command}" "$@"
