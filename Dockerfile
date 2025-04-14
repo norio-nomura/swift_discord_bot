@@ -33,6 +33,22 @@ ARG SWIFT_IMAGE_SELECTOR=${_PARSE_USE_SNAPSHOT:+pre-built-swift-image}
 # if empty, USE_SNAPSHOT is true, build snapshot image
 ARG SWIFT_IMAGE_SELECTOR=${SWIFT_IMAGE_SELECTOR:-swift-snapshot-image-built-here}
 
+# build arg to control whether to use swift sdks or not
+ARG USE_SWIFT_SDKS
+ARG _PARSE_USE_SWIFT_SDKS=${USE_SWIFT_SDKS:-false}
+# remove truthy values
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#ON}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#on}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#TRUE}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#true}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#YES}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#yes}
+ARG _PARSE_USE_SWIFT_SDKS=${_PARSE_USE_SWIFT_SDKS#1}
+# if not empty, USE_SWIFT_SDKS is false, do not install swift sdks
+ARG SWIFT_SDKS_SELECTOR=${_PARSE_USE_SWIFT_SDKS:+dependencies}
+# if empty, USE_SWIFT_SDKS is true, install swift sdks
+ARG SWIFT_SDKS_SELECTOR=${SWIFT_SDKS_SELECTOR:-swift-sdks}
+
 ####################################################################################################
 # helpser scripts
 ####################################################################################################
@@ -172,6 +188,7 @@ FROM ${PLATFORM_IMAGE} AS use-swift-snapshot-image-built-here
 # LABEL maintainer="Swift Infrastructure <swift-infrastructure@forums.swift.org>"
 # LABEL description="Docker Container for the Swift programming language"
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
+ARG TARGETARCH
 
 # install /usr/local/bin/apt-get-update script
 COPY --from=apt-get-update /* /usr/local/bin/
@@ -235,7 +252,7 @@ COPY --from=mikefarah/yq /usr/bin/yq /usr/local/bin/
 
 ARG WASMKIT_BUILDER=/wasmkit-builder
 WORKDIR ${WASMKIT_BUILDER}
-RUN --mount=type=tmpfs,target=${WASMKIT_BUILDER} --mount=type=cache,target=${WASMKIT_BUILDER}/.build <<'EOF'
+RUN --mount=type=cache,target=/root/.cache --mount=type=tmpfs,target=${WASMKIT_BUILDER} --mount=type=cache,target=${WASMKIT_BUILDER}/.build <<'EOF'
     # detect the latest wasmkit release tag
     tag=$(curl -fLsS "https://github.com/swiftwasm/wasmkit/releases/latest" -H'Accept: application/json' | jq -r .tag_name)
 
@@ -258,13 +275,7 @@ FROM use-${SWIFT_IMAGE_SELECTOR} AS prepare-dependencies
 ARG USERNAME=bot
 RUN mkdir -p /etc/skel/.cache/deno && useradd -m $USERNAME
 
-# Install SwiftSDKs on the bot user
-USER $USERNAME
-RUN --mount=type=bind,from=swift-sdks-downloader,source=/swift-sdks,target=/swift-sdks \
-    find /swift-sdks -type f | xargs -n 1 -r swift sdk install
-
 # install tools
-USER root
 WORKDIR /usr/local/bin
 
 # install apt dependencies
@@ -312,11 +323,28 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
     deno --version
 EOF
 
+# install swift-* wrapper scripts
+COPY --chmod=755 swift-wrappers/swift-+ /usr/bin/
+
+# create symbolic links to swift-+
+RUN /usr/bin/swift-+ --install-shortcuts
+
+####################################################################################################
+# prepare-swift-sdks
+####################################################################################################
+FROM prepare-dependencies AS prepare-swift-sdks
+
+USER root
+WORKDIR /usr/local/bin
+
 # install wasmer
 RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
     github-release-artifact-with-pattern "wasmerio/wasmer" 'linux-'"$(arch)"'.tar.gz$' v6.0.0-alpha.2 | tar xzf - --directory .. --no-same-owner
     wasmer-headless --version
 EOF
+
+# install wasmkit-cli
+COPY --from=wasmkit-builder /usr/bin/wasmkit-cli /usr/local/bin/
 
 # install wasmtime
 RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
@@ -330,22 +358,15 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
     wazero version
 EOF
 
-# install wasmkit-cli
-COPY --from=wasmkit-builder /usr/bin/wasmkit-cli /usr/local/bin/
-
-# install swift-* wrapper scripts
-COPY --chmod=755 swift-wrappers/swift-+ /usr/bin/
-
-# create symbolic links to swift-+
-RUN /usr/bin/swift-+ --install-shortcuts
-
-# use the bot user
+# Install SwiftSDKs on the bot user
 USER $USERNAME
+RUN --mount=type=bind,from=swift-sdks-downloader,source=/swift-sdks,target=/swift-sdks \
+    find /swift-sdks -type f | xargs -n 1 -r swift sdk install
 
 ####################################################################################################
 # development stage for developing bot in devcontainer on VSCode
 ####################################################################################################
-FROM prepare-dependencies AS debugger
+FROM prepare-${SWIFT_SDKS_SELECTOR} AS debugger
 
 ARG DEBUGGER_USERNAME=debugger
 USER root
@@ -374,7 +395,10 @@ USER ${DEBUGGER_USERNAME}
 ####################################################################################################
 # production stage for running bot on production
 ####################################################################################################
-FROM prepare-dependencies AS production
+FROM prepare-${SWIFT_SDKS_SELECTOR} AS production
+
+# use the bot user
+USER $USERNAME
 
 # Install Bot Source Code
 WORKDIR /bot

@@ -5,6 +5,7 @@ services:
         DOCKER_IMAGE: swift
         SWIFT_WEBROOT: https://download.swift.org/development
         USE_SNAPSHOT: false
+        USE_SWIFT_SDKS: true
       context: .
       dockerfile: Dockerfile
       secrets:
