@@ -1,8 +1,6 @@
 #!/bin/bash
 set -eu -o pipefail
 
-render_yaml="${1:-render.yaml}"
-
 for c in gh jq yq; do
 	command -v "${c}" >/dev/null || {
 		echo "${c} is required to run this script. Please install ${c}."
@@ -109,6 +107,7 @@ function print_swiftsdk_from_swiftwasm_tag() {
 
 function print_swiftwasm_sdk_hash_and_url() {
 	SWIFTWASM_TAG="$(query_swiftwasm_tag "${1}")"
+	[[ -z ${SWIFTWASM_TAG} ]] && return
 	print_swiftsdk_from_swiftwasm_tag "${SWIFTWASM_TAG}"
 }
 
@@ -119,6 +118,7 @@ function print_swift_static_sdk_development_snapshot_hash_and_url() {
 	[[ ${webroot} == swift-branch ]] && webroot="development"
 	static_sdk_yml_url="https://github.com/swiftlang/swift-org-website/raw/refs/heads/main/_data/builds/${webroot/\./_}/static_sdk.yml"
 	static_sdk_json="$(curl -fLsS "${static_sdk_yml_url}" -o - | yq -o=json -)"
+	[[ ${static_sdk_json} == null ]] && return
 	for pattern in $(swift_tag_patterns_from_swift_version "${swift_version}"); do
 		# shellcheck disable=SC2016,SC2086
 		jq -e -r '
@@ -148,7 +148,7 @@ function print_swift_static_sdk_release_hash_and_url() {
 }
 
 function print_swift_static_sdk_hash_and_url() {
-	local swift_version="${1}" pattern static_sdk_yml_url static_sdk_json swift_releases_yml_url swift_releases_json webroot
+	local swift_version="${1}"
 	case "${swift_version}" in
 	swift-*DEVELOPMENT-SNAPSHOT-*)
 		print_swift_static_sdk_development_snapshot_hash_and_url "${swift_version}"
@@ -163,10 +163,11 @@ function print_swift_static_sdk_hash_and_url() {
 	esac
 }
 
-SWIFT_VERSION="$(detect_swift_version_from_render_yaml "${render_yaml}")"
+SWIFT_VERSION="${1:-}"
+SWIFT_VERSION="${SWIFT_VERSION:-$(detect_swift_version_from_render_yaml "render.yaml")}"
 SWIFT_SDKS="$(
 	print_swift_static_sdk_hash_and_url "${SWIFT_VERSION}"
 	print_swiftwasm_sdk_hash_and_url "${SWIFT_VERSION}"
 )"
 
-echo "${SWIFT_SDKS}" | tee swift-sdks.txt
+echo -n "${SWIFT_SDKS}" | tee swift-sdks.txt
