@@ -10,19 +10,28 @@ done
 
 gh extension install norio-nomura/gh-query-tags 2>/dev/null
 
-function detect_swift_snapshot_version() {
-	local dockerfile="Dockerfile" render_yaml="${1}" SWIFT_WEBROOT SWIFT_PLATFORM PLATFORM_CODENAME OS_MAJOR_VER OS_MIN_VER OS_ARCH_SUFFIX arch latest_build_yml_url
+function build_arg_from_docker_compose_yml() {
+	local docker_compose_yml="${1}" arg_key="${2}" default_value="${3}" OUTPUT
+	yq -o json "${docker_compose_yml}" | jq -r '
+		.services.observant.build.args["'"${arg_key}"'"] // "'"${default_value}"'"
+	'
+}
 
-	SWIFT_WEBROOT="$(yq eval '
-		.services[0]|.envVars|map(select(.key == "SWIFT_WEBROOT"))[0]|.value // "https://download.swift.org/development"
-	' "${render_yaml}")"
+function detect_swift_snapshot_version() {
+	local dockerfile="Dockerfile" docker_compose_yml="${1}" SWIFT_WEBROOT SWIFT_PLATFORM PLATFORM_CODENAME OS_MAJOR_VER OS_MIN_VER OS_ARCH_SUFFIX arch latest_build_yml_url
+
+	SWIFT_WEBROOT="$(build_arg_from_docker_compose_yml "${docker_compose_yml}" SWIFT_WEBROOT "https://download.swift.org/development")"
 	SWIFT_PLATFORM="$(sed -n -E 's/^ARG SWIFT_PLATFORM=(.*)$/\1/p' "${dockerfile}")"
 	PLATFORM_CODENAME="$(sed -n -E 's/^ARG PLATFORM_CODENAME=(.*)$/\1/p' "${dockerfile}")"
 	OS_MAJOR_VER=${PLATFORM_CODENAME}
+	OS_MAJOR_VER=${OS_MAJOR_VER/xenial/16}
+	OS_MAJOR_VER=${OS_MAJOR_VER/bionic/18}
 	OS_MAJOR_VER=${OS_MAJOR_VER/focal/20}
 	OS_MAJOR_VER=${OS_MAJOR_VER/jammy/22}
 	OS_MAJOR_VER=${OS_MAJOR_VER/noble/24}
 	OS_MIN_VER=${PLATFORM_CODENAME}
+	OS_MIN_VER=${OS_MIN_VER/xenial/04}
+	OS_MIN_VER=${OS_MIN_VER/bionic/04}
 	OS_MIN_VER=${OS_MIN_VER/focal/04}
 	OS_MIN_VER=${OS_MIN_VER/jammy/04}
 	OS_MIN_VER=${OS_MIN_VER/noble/04}
@@ -40,28 +49,26 @@ function detect_swift_snapshot_version() {
 }
 
 function detect_swift_release_version() {
-	local render_yaml="${1}" VERSION_NUMBER
-	VERSION_NUMBER="$(yq eval '
-		.services[0]|.envVars|map(select(.key == "DOCKER_IMAGE"))[0]
-		|.value // ""|capture(":(?P<version>\d+\.\d+(\.\d+)?)")|.version // "latest"
-	' "${render_yaml}")"
-	[[ ${VERSION_NUMBER} == "latest" ]] && VERSION_NUMBER="$(
+	local docker_compose_yml="${1}" SWIFT_IMAGE VERSION_NUMBER
+	SWIFT_IMAGE=$(build_arg_from_docker_compose_yml "${docker_compose_yml}" DOCKER_IMAGE "swift")
+	VERSION_NUMBER="$(sed -E -n 's/^.*:([0-9]+\.[0-9]+(\.[0-9]+)?)$/\1/p' <<<"${SWIFT_IMAGE}")"
+	[[ -z ${VERSION_NUMBER} || ${VERSION_NUMBER} == "latest" ]] && VERSION_NUMBER="$(
 		curl -fLsS "https://github.com/swiftlang/swift-org-website/raw/refs/heads/main/_data/builds/swift_releases.yml" | yq e '.[-1].name'
 	)"
 	echo "swift-${VERSION_NUMBER}-RELEASE"
 }
 
-function detect_swift_version_from_render_yaml() {
-	local render_yaml="${1}"
-	USE_SNAPSHOT="$(yq eval '.services[0]|.envVars|map(select(.key == "USE_SNAPSHOT"))[0]|.value' "${render_yaml}")"
+function detect_swift_version_from_docker_compose_yml() {
+	local docker_compose_yml="${1}"
+	USE_SNAPSHOT="$(build_arg_from_docker_compose_yml "${docker_compose_yml}" USE_SNAPSHOT "")"
 	case "${USE_SNAPSHOT}" in
 	"ON" | "on" | "TRUE" | "true" | "YES" | "yes" | "1")
 		# swift-(\d+\.\d+-)?DEVELOPMENT-SNAPSHOT-\d+-\d+-\d+-a
-		detect_swift_snapshot_version "${render_yaml}"
+		detect_swift_snapshot_version "${docker_compose_yml}"
 		;;
 	*)
 		# swift-\d+\.\d+(.\d+)?-RELEASE
-		detect_swift_release_version "${render_yaml}"
+		detect_swift_release_version "${docker_compose_yml}"
 		;;
 	esac
 }
@@ -164,10 +171,18 @@ function print_swift_static_sdk_hash_and_url() {
 }
 
 SWIFT_VERSION="${1:-}"
-SWIFT_VERSION="${SWIFT_VERSION:-$(detect_swift_version_from_render_yaml "render.yaml")}"
-SWIFT_SDKS="$(
-	print_swift_static_sdk_hash_and_url "${SWIFT_VERSION}"
-	print_swiftwasm_sdk_hash_and_url "${SWIFT_VERSION}"
-)"
-
-echo -n "${SWIFT_SDKS}" | tee swift-sdks.txt
+SWIFT_VERSION="${SWIFT_VERSION:-$(detect_swift_version_from_docker_compose_yml "docker-compose.yml")}"
+USE_SWIFT_SDKS="$(build_arg_from_docker_compose_yml "docker-compose.yml" USE_SWIFT_SDKS "false")"
+case "${USE_SWIFT_SDKS}" in
+"ON" | "on" | "TRUE" | "true" | "YES" | "yes" | "1")
+	SWIFT_SDKS="$(
+		print_swift_static_sdk_hash_and_url "${SWIFT_VERSION}"
+		print_swiftwasm_sdk_hash_and_url "${SWIFT_VERSION}"
+	)"
+	echo -n "${SWIFT_SDKS}" | tee swift-sdks.txt
+	;;
+*)
+	echo -n "" | tee swift-sdks.txt
+	exit 0
+	;;
+esac
