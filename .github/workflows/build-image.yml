@@ -128,7 +128,6 @@ jobs:
             type=match,pattern=swift/(.*),group=1,value=${{ github.ref }}
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,prefix=pr-,suffix=,event=pr
-            type=sha
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests
@@ -139,3 +138,11 @@ jobs:
       - name: Inspect image
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
+
+      - name: Cleanup registry
+        uses: actions/delete-package-versions@v5
+        with:
+          package-name: ${{ github.event.repository.name }}
+          package-type: container
+          min-versions-to-keep: 50
+          delete-only-untagged-versions: 'true'
