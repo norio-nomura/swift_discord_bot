@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - main
+      - 'swift/**'
   pull_request:
     branches:
       - main
@@ -18,17 +19,30 @@ permissions:
 # Thanks for: https://zenn.dev/till0196/articles/8efa063c953350
 
 jobs:
+  parse-docker-compose:
+    runs-on: ubuntu-latest
+    outputs:
+      build-args: ${{ steps.parse.outputs.build-args }}
+      platforms: ${{ steps.parse.outputs.platforms }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: parse
+        run: |
+          build_args=$(yq eval '.services.observant.build.args|to_entries[]|"\(.key)=\(.value)"' docker-compose.yml)
+          delimiter="$(openssl rand -hex 8)"
+          echo "build-args<<${delimiter}" >> $GITHUB_OUTPUT
+          echo "${build_args}" >> $GITHUB_OUTPUT
+          echo "${delimiter}" >> $GITHUB_OUTPUT
+          platforms=$(yq -o json '.services.observant.build.platforms' docker-compose.yml | jq -c)
+          echo "platforms=${platforms}" >> $GITHUB_OUTPUT
+
   build:
+    needs: parse-docker-compose
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-24.04
-            platform: linux/amd64
-          - os: ubuntu-24.04-arm
-            platform: linux/arm64
-
-    runs-on: ${{ matrix.os }}
+        platform: ${{ fromJSON(needs.parse-docker-compose.outputs.platforms) }}
+    runs-on: ${{ endsWith(matrix.platform, 'arm64') && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,15 +72,14 @@ jobs:
         id: build
         uses: docker/build-push-action@v6
         with:
-          cache-from: type=gha,scope=${{ runner.arch }}
-          cache-to: type=gha,mode=max,scope=${{ runner.arch }}
+          build-args: ${{ needs.parse-docker-compose.outputs.build-args }}
+          cache-from: type=gha,scope=${{ github.ref }}-${{ runner.arch }}
+          cache-to: type=gha,mode=max,scope=${{ github.ref }}-${{ runner.arch }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           platforms: ${{ matrix.platform }}
-          push: ${{ github.ref == 'refs/heads/main' }}
           secrets: |
             "github_token=${{ secrets.GITHUB_TOKEN }}"
-          tags: ${{ env.REGISTRY_IMAGE }}
 
       - name: Export digest
         run: |
@@ -109,10 +122,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY_IMAGE }}
+          flavor: |
+            latest=false
           tags: |
+            type=match,pattern=swift/(.*),group=1,value=${{ github.ref }}
+            type=raw,value=latest,enable={{is_default_branch}}
             type=ref,prefix=pr-,suffix=,event=pr
             type=sha
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
 
       - name: Create manifest list and push
         working-directory: ${{ runner.temp }}/digests

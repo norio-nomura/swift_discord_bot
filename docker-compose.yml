@@ -6,6 +6,9 @@ services:
         SWIFT_WEBROOT: https://download.swift.org/development
         USE_SNAPSHOT: false
         USE_SWIFT_SDKS: true
+      platforms:
+        - linux/amd64
+        - linux/arm64
       context: .
       dockerfile: Dockerfile
       secrets:
