@@ -297,6 +297,13 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --m
 
 # install llvm-symbolizer
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} <<'EOF'
+    # Check apt version
+    distrib_release=$(source /etc/lsb-release && echo "${DISTRIB_RELEASE%.*}")
+    [[ $distrib_release -ge 22 ]] || {
+        echo >&2 "Skip llvm-symbolizer installation, since apt-patterns does not support 'reverse-depends'"
+        exit 0
+    }
+
     # Use apt-patterns(7) to search llvm-[0-9]+ package that is depended by llvm package
     apt_patterns_for_llvm='?and(?reverse-depends(?exact-name(llvm)),?name(llvm-[0-9]+))'
 
