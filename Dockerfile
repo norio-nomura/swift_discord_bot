@@ -178,7 +178,7 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --m
     rm swift-sdks.txt
     [ -z "${swift_sdks_txt}" ] && exit
     apt-get-install ca-certificates curl
-    echo -n "${swift_sdks_txt}" | while read -r sha256 url; do
+    cat <<<"${swift_sdks_txt}" | while read -r sha256 url; do
         curl -fLsS "${url}" -O -w "${sha256} %{filename_effective}\n" | sha256sum --check --strict -
     done
 EOF
