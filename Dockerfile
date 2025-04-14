@@ -234,24 +234,6 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --m
 # install yq
 COPY --from=mikefarah/yq /usr/bin/yq /usr/local/bin/
 
-# install static linux sdk
-RUN --mount=type=bind,from=swift-sdks-downloader,source=/swift-sdks,target=/swift-sdks <<'EOF'
-    swift_tag=$(swift --version | jq -eRr 'capture("(?<v>swift-\\d+\\.\\d(\\.\\d+)?-RELEASE)")|.v')
-    swift_releases_yml_url="https://github.com/swiftlang/swift-org-website/raw/refs/heads/main/_data/builds/swift_releases.yml"
-    swift_releases_json=$(curl -fLsS "${swift_releases_yml_url}" -o - | yq -o=json -)
-    checksum_and_artifact_url=$(
-        jq --raw-output --arg tag "${swift_tag}" '
-            reverse|map(select(.tag == $tag))|first
-            |.platforms|map(select(.platform == "static-sdk"))|first
-            |"\(.checksum) https://download.swift.org/\($tag|ascii_downcase)/static-sdk/\($tag)/\($tag)_static-linux-0.0.1.artifactbundle.tar.gz"
-            // empty
-        ' <<<"${swift_releases_json}"
-    )
-    read -r checksum artifact_url <<<"${checksum_and_artifact_url}"
-    [[ ! -f "/swift-sdks/$(basename "${artifact_url}")" ]] || artifact_url="/swift-sdks/$(basename "${artifact_url}")"
-    swift sdk install --checksum "${checksum}" "${artifact_url}" >/dev/null
-EOF
-
 ARG WASMKIT_BUILDER=/wasmkit-builder
 WORKDIR ${WASMKIT_BUILDER}
 RUN --mount=type=tmpfs,target=${WASMKIT_BUILDER} --mount=type=cache,target=${WASMKIT_BUILDER}/.build <<'EOF'
@@ -262,7 +244,6 @@ RUN --mount=type=tmpfs,target=${WASMKIT_BUILDER} --mount=type=cache,target=${WAS
     curl -fLsS "https://github.com/swiftwasm/wasmkit/archive/refs/tags/${tag}.tar.gz" | tar zxf - --no-same-owner --strip-component=1
 
     # build wasmkit-cli
-    # BUILD_FLAGS=(--swift-sdk "$(arch)-swift-linux-musl" -Xlinker -strip-all -c release --product wasmkit-cli)
     BUILD_FLAGS=(--static-swift-stdlib -c release --product wasmkit-cli)
     swift build "${BUILD_FLAGS[@]}"
     install -D -t /usr/bin "$(swift build --show-bin-path "${BUILD_FLAGS[@]}")/wasmkit-cli"
