@@ -24,15 +24,12 @@ services:
       - GITHUB_TOKEN
       - NUMBER_OF_LINES_TO_EMBED_OUTPUT
       - NUMBER_OF_LINES_TO_EMBED_UPLOADED_OUTPUT
-      - PORT=8081
       - TARGET_ARGS_TO_USE_STDIN
       - TARGET_CLI
       - TARGET_DEFAULT_ARGS
       - TIMEOUT_ARGS=--signal=KILL 120
       - TIMEOUT_COMMAND
     tty: true
-    ports:
-      - "8081:8081"
 secrets:
   github_token:
     file: .github_token
