@@ -33,12 +33,12 @@ export TARGET_CLI=${TARGET_CLI:-swift}
 export TARGET_ARGS_TO_USE_STDIN=${TARGET_ARGS_TO_USE_STDIN:--}
 
 vars=()
-for v in DENO_TLS_CA_STORE HTTP_PROXY HTTPS_PROXY PATH PORT; do
+for v in DENO_TLS_CA_STORE HTTP_PROXY HTTPS_PROXY PATH; do
 	vars=("${vars[@]}" "${!v+${v}=${!v}}")
 done
 
 DENO_ARGS=(
-	--allow-env="PATH,PORT"
+	--allow-env="PATH"
 	--allow-net
 	--allow-run=/usr/bin/env
 	--allow-read="${TMPDIR:-/tmp}"
