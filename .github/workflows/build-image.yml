@@ -146,3 +146,25 @@ jobs:
           package-type: container
           min-versions-to-keep: 200
           delete-only-untagged-versions: 'true'
+
+      - name: Deploy
+        if: github.event_name == 'push' && startsWith(github.ref_name, 'swift/')
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          [ -z "${DEPLOY_HOST}" ] && echo "Skipping deploy, no host provided" && exit 0
+          [ -z "${DEPLOY_HOST_KEY}" ] && echo "Skipping deploy, no host key provided" && exit 0
+          [ -z "${DEPLOY_KEY}" ] && echo "Skipping deploy, no deploy key provided" && exit 0
+          ssh-agent bash <<EOF
+            echo "${DEPLOY_KEY}" | ssh-add -q - &&
+            ssh_args=(
+              -n # no tty
+              -o KnownHostsCommand="/usr/bin/env echo ${DEPLOY_HOST_KEY}" # pass the host key
+              "${DEPLOY_HOST}"        # host
+              bot/start               # command to deploy
+              "${GITHUB_REF_NAME#*/}" # target image tag
+            ) &&
+            ssh "\${ssh_args[@]}"
+          EOF
