@@ -1,5 +1,9 @@
 #!/bin/bash
 
+swift + macos - <<<"import SwiftUI" &
+swift + ios - <<<"import SwiftUI" &
+disown -a
+
 nickname() {
 	local swift_version_output
 	swift_version_output=$(swift -version 2>/dev/null) || return
