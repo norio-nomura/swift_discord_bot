@@ -1,6 +1,8 @@
 #!/bin/bash
 
-echo "RENDER_INSTANCE_ID: ${RENDER_INSTANCE_ID}"
+swift + macos - <<<"import SwiftUI" &
+swift + ios - <<<"import SwiftUI" &
+disown -a
 
 nickname() {
 	local swift_version_output
