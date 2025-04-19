@@ -26,6 +26,7 @@ jobs:
       cache-from: ${{ steps.parse.outputs.cache-from }}
       cache-to: ${{ steps.parse.outputs.cache-to }}
       platforms: ${{ steps.parse.outputs.platforms }}
+      use-swift-sdks: ${{ steps.parse.outputs.use-swift-sdks }}
     steps:
       - uses: actions/checkout@v4
       - id: parse
@@ -35,21 +36,10 @@ jobs:
           echo "build-args<<${delimiter}" >> $GITHUB_OUTPUT
           echo "${build_args}" >> $GITHUB_OUTPUT
           echo "${delimiter}" >> $GITHUB_OUTPUT
-          use_swift_sdks=$(yq eval '.services.observant.build.args.USE_SWIFT_SDKS' docker-compose.yml)
-          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
-            ref=${GITHUB_BASE_REF/\//-}
-          else
-            ref=${GITHUB_REF_NAME/\//-}
-          fi
-          if [ "${use_swift_sdks}" = "true" ]; then
-            cache_param="type=gha,scope=${ref}-$(dpkg --print-architecture)"
-          else
-            cache_param="type=registry,ref=${REGISTRY_IMAGE}:cache-${ref}-$(dpkg --print-architecture)"
-          fi
-          echo "cache-from=${cache_param}" >> $GITHUB_OUTPUT
-          echo "cache-to=${cache_param},mode=max" >> $GITHUB_OUTPUT
           platforms=$(yq -o json '.services.observant.build.platforms' docker-compose.yml | jq -c)
           echo "platforms=${platforms}" >> $GITHUB_OUTPUT
+          use_swift_sdks=$(yq eval '.services.observant.build.args.USE_SWIFT_SDKS' docker-compose.yml)
+          echo "use-swift-sdks=${use_swift_sdks}" >> $GITHUB_OUTPUT
 
   build:
     needs: parse-docker-compose
@@ -66,6 +56,21 @@ jobs:
         run: ./update-swift-sdks.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - id: cache-param
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            ref=${GITHUB_BASE_REF/\//-}
+          else
+            ref=${GITHUB_REF_NAME/\//-}
+          fi
+          if [ "${{ needs.parse-docker-compose.outputs.use-swift-sdks }}" = "true" ]; then
+            cache_param="type=gha,scope=${ref}-$(dpkg --print-architecture)"
+          else
+            cache_param="type=registry,ref=${REGISTRY_IMAGE}:cache-${ref}-$(dpkg --print-architecture)"
+          fi
+          echo "cache-from=${cache_param}" >> $GITHUB_OUTPUT
+          echo "cache-to=${cache_param},mode=max" >> $GITHUB_OUTPUT
 
       - name: Docker meta
         id: meta
@@ -88,8 +93,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           build-args: ${{ needs.parse-docker-compose.outputs.build-args }}
-          cache-from: ${{ needs.parse-docker-compose.outputs.cache-from }}
-          cache-to: ${{ needs.parse-docker-compose.outputs.cache-to }}
+          cache-from: ${{ steps.cache-param.outputs.cache-from }}
+          cache-to: ${{ steps.cache-param.outputs.cache-to }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
           platforms: ${{ matrix.platform }}
