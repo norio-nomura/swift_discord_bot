@@ -126,27 +126,24 @@ ARG TARGETARCH
 COPY --from=apt-get-update /* /usr/local/bin/
 
 # download Swift toolchain
+ARG SWIFT_WEBROOT #=https://download.swift.org/development
 ARG SWIFT_PLATFORM #=ubuntu
 ARG OS_MAJOR_VER #=24
 ARG OS_MIN_VER #=04
-ARG SWIFT_WEBROOT #=https://download.swift.org/development
+ARG OS_ARCH_SUFFIX=${TARGETARCH}
+ARG OS_ARCH_SUFFIX=${OS_ARCH_SUFFIX/amd64/}
+ARG OS_ARCH_SUFFIX=${OS_ARCH_SUFFIX/arm64/-aarch64}
+ARG PLATFORM_WEBROOT="${SWIFT_WEBROOT}/${SWIFT_PLATFORM}${OS_MAJOR_VER}${OS_MIN_VER}${OS_ARCH_SUFFIX}"
 
 WORKDIR /swift-toolchain
+# Use ADD to invalidate cache, if latest-build.yml has been changed
+ADD ${PLATFORM_WEBROOT}/latest-build.yml .
 RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --mount=type=cache,sharing=locked,target=/var/lib/apt,id=${TARGETARCH} <<EOF
-    case $(arch) in
-    x86_64) OS_ARCH_SUFFIX='' ;;
-    aarch64) OS_ARCH_SUFFIX='-aarch64' ;;
-    *) echo >&2 "error: unsupported architecture: '$(arch)'"; exit 1 ;;
-    esac
-    PLATFORM_WEBROOT="${SWIFT_WEBROOT}/${SWIFT_PLATFORM}${OS_MAJOR_VER}${OS_MIN_VER}${OS_ARCH_SUFFIX}"
-    latest_build_yml="${PLATFORM_WEBROOT}/latest-build.yml"
-    echo "${latest_build_yml}"
-
     # - Grab curl here so we cache better up above
     apt-get-install ca-certificates curl gnupg2
 
     # - Latest Toolchain info
-    source <(curl -s "${latest_build_yml}" | sed -E 's/^([^:]+): +(.*)$/\1="\2"/')
+    source <(sed -E 's/^([^:]+): +(.*)$/\1="\2"/' latest-build.yml)
     [[ -n ${dir} && -n ${download} && -n ${download_signature} ]] || exit
     echo "${dir}" >.swift_tag
     download_url_base="${PLATFORM_WEBROOT}/${dir}"
