@@ -33,7 +33,8 @@ jobs:
         with:
           fetch-depth: 0  # Using default '1' causes creating detached branch on Forrce Push Commit.
           ref: swift/${{ matrix.id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # To trigger new workflow run by pushing commit, do not use secrets.GITHUB_TOKEN
+          token: ${{ secrets.TOKEN_TO_TRIGGER_PUSH_EVENTS }}
 
       - name: Check Commit
         if: ${{ !inputs.force-update }}
