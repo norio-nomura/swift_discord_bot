@@ -1,0 +1,1 @@
+228b8231abd7012b2c285aa3c6ea8e98b9c1fda73b39c1d9c7e00309b6dace5a https://github.com/kabiroberai/swift-sdk-darwin/releases/download/1.4.0/darwin-linux-aarch64.artifactbundle.zip

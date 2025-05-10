@@ -178,6 +178,7 @@ case "${USE_SWIFT_SDKS}" in
 	SWIFT_SDKS="$(
 		print_swift_static_sdk_hash_and_url "${SWIFT_VERSION}"
 		print_swiftwasm_sdk_hash_and_url "${SWIFT_VERSION}"
+		echo -n "228b8231abd7012b2c285aa3c6ea8e98b9c1fda73b39c1d9c7e00309b6dace5a https://github.com/kabiroberai/swift-sdk-darwin/releases/download/1.4.0/darwin-linux-aarch64.artifactbundle.zip"
 	)"
 	echo -n "${SWIFT_SDKS}" | tee swift-sdks.txt
 	;;
