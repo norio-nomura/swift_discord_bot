@@ -7,26 +7,10 @@
 	],
 	"service": "observant",
 	"workspaceFolder": "/workspaces/swift_discord_bot",
-	"mounts": [
-		{
-			"source": "deno-cache-for-bot",
-			"target": "/home/bot/.cache/deno",
-			"type": "volume"
-		},
-		{
-			"source": "deno-cache-for-debug",
-			"target": "/home/debugger/.cache/deno",
-			"type": "volume"
-		}
-	],
 	"customizations": {
 		"vscode": {
 			"extensions": [
-				"denoland.vscode-deno"
-			],
-			"settings": {
-				"deno.path": "/usr/local/bin/deno" // it must be full path
-			}
+			]
 		}
 	}
 }
