@@ -1,85 +1,88 @@
 # Swift Compiler Discord Bot
 
-Written in [Deno](https://deno.land) and deployed with Docker.
+Deploy a Discord bot that executes Swift CLI commands using [cli_discord_bot2](https://github.com/norio-nomura/cli_discord_bot2).
 
-This is a generalized version of [SwiftCompilerDiscordappBot](https://github.com/norio-nomura/SwiftCompilerDiscordappBot) that can be used with various CLIs by configuration.
+## Getting Started
 
-## How to use
+### 1. Set Up a Discord Bot Account
 
-1. Set Up Bot Account
+Follow the [official guide](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token) to create a Discord bot and obtain a token.
 
-   [Creating a discord bot & getting a token](https://github.com/reactiflux/discord-irc/wiki/Creating-a-discord-bot-&-getting-a-token)
+**Required Permissions:**
 
-   Required Permissions:
+- `CHANGE_NICKNAME` — to update the bot's nickname
+- `READ_MESSAGE_HISTORY` and `VIEW_CHANNEL` — to update replies when users edit or delete messages
 
-   - `CHANGE_NICKNAME` for update nickname
-   - `READ_MESSAGE_HISTORY` and `VIEW_CHANNEL` for update replies on updating
-     request from user
+### 2. Invite the Bot to Your Server
 
-2. Invite Bot to Your Guild
+Replace `<Client ID>` with your bot's Client ID and open the following URL in your browser:
 
-   Open following URL with changing `<Client ID>` to your bot's Client ID:
-   `https://discord.com/api/oauth2/authorize?client_id=<Client ID>&scope=bot&permissions=67175424`
+```
+https://discord.com/api/oauth2/authorize?client_id=<Client ID>&scope=bot&permissions=67174400
+```
 
-3. Run bot on local host using `docker compose`
-   ```terminal.sh-session
-   export DISCORD_TOKEN="<discord token here>" # discord token
-   export GITHUB_TOKEN="<github token here>"   # github token
-   docker compose up
-   ```
 
-4. Send mention to Bot
+### 3. Run the Bot Locally with Docker Compose
 
-   - The bot will use the first code block as its standard input.
-   - The bot will treat the mentioned lines as arguments for CLI command lines.
-   - The bot will run the CLI for each command line and return them in replies.
-   - When you edit/delete a mention, the bot will also edit/delete its replies.
-   - The bot will reply in DM channel without mentions.
+```sh
+export DISCORD_TOKEN="<discord token here>" # Discord bot token
+docker compose up
+```
 
-   ![screenshot](screenshot.png)
+### 4. Interact with the Bot
+
+- Mention the bot in a message. The first code block in your message will be used as standard input.
+- Lines mentioning the bot will be treated as CLI command arguments.
+- The bot executes the CLI for each command line and replies with the results.
+- If you edit or delete your mention, the bot will also edit or delete its replies.
+- In DMs, the bot will reply without requiring a mention.
+
+![screenshot](screenshot.png)
+
 
 ## Configuration
 
-### Build time configuration
 
-#### Using Official Docker Image
+### Build-Time Configuration
 
-| Variable Name  | Description                                | default                     |
-| -------------- | ------------------------------------------ | --------------------------- |
-| `DOCKER_IMAGE` | Docker image that provides swift on ubuntu | swift:jammy                 |
+#### Using the Official Docker Image
 
-#### Using swift-DEVELOPMENT-SNAPSHOTS-* tarball
+| Variable Name  | Description                                | Default         |
+| -------------- | ------------------------------------------ | --------------- |
+| `DOCKER_IMAGE` | Docker image that provides Swift on Ubuntu | `swift:jammy`   |
 
-| Variable Name   | Description                               | default                                |
-| --------------- | ----------------------------------------- | -------------------------------------- |
-| `SWIFT_WEBROOT` | Webroot getting Swift toolcahin tar ball  | https://download.swift.org/development |
+#### Using swift-DEVELOPMENT-SNAPSHOTS-* Tarball
 
-### Environment variables for run time configurations
+| Variable Name   | Description                                 | Default                                |
+| --------------- | ------------------------------------------- | -------------------------------------- |
+| `SWIFT_WEBROOT` | Webroot for downloading Swift toolchain tar | https://download.swift.org/development |
 
-| Variable Name              | Description                            | default            |
+
+
+### Environment Variables (Run-Time Configuration)
+
+| Variable Name              | Description                            | Default            |
 | -------------------------- | -------------------------------------- | ------------------ |
-| `DISCORD_TOKEN`            | Discord Bot's token                    |                    |
-| `DISCORD_NICKNAME`         | Discord Nickname                       | Swift Version      |
-| `DISCORD_PLAYING`          | status for "Playing"                   | Tag in apple/swift |
-| `ENV_COMMAND`              | Env command launching Timeout command  | `/usr/bin/env`     |
-| `ENV_ARGS`                 | arguments for Env command              | `-i`               |
-| ``GITHUB_TOKEN`            | GitHub token (permission: public_repo) |                    |
-| `TARGET_CLI`               | target CLI                             | `swift`            |
-| `TARGET_ARGS_TO_USE_STDIN` | arguments for CLI with input           | `-`                |
-| `TARGET_DEFAULT_ARGS`      | arguments for CLI with no arguments    |                    |
-| `TIMEOUT_COMMAND`          | Timeout command launching target CLI   | `timeout`          |
-| `TIMEOUT_ARGS`             | arguments for timeout command          | `--signal=KILL 30` |
+| `DISCORD_TOKEN`            | Discord bot token                      |                    |
+| `DISCORD_NICKNAME`         | Discord nickname                       | Swift Version      |
+| `DISCORD_PLAYING`          | Status for "Playing"                   | Tag in apple/swift |
+| `ENV_COMMAND`              | Env command to launch target CLI       | `/usr/bin/env -i`  |
+| `GITHUB_TOKEN`             | GitHub token (permission: public_repo) |                    |
+| `TARGET_CLI`               | Target CLI                             | `swift`            |
+| `TARGET_ARGS_TO_USE_STDIN` | Arguments for CLI with input           | `-`                |
+| `TARGET_DEFAULT_ARGS`      | Arguments for CLI with no arguments    |                    |
+| `TIMEOUT_SECONDS`          | Timeout (seconds) for CLI command      | `30`               |
 
-### Example
 
-#### swift 5.4 compiler bot:
 
-```terminal.sh-session
-export DISCORD_TOKEN="<discord token here>" # discord token
-export DOCKER_IMAGE=swift:5.4               # docker image
-export GITHUB_TOKEN="<github token here>"   # github token
+### Example: Swift Compiler Bot
+
+```sh
+export DISCORD_TOKEN="<discord token here>" # Discord bot token
+export DOCKER_IMAGE=swift:latest            # Docker image
 docker compose up
 ```
+
 
 ## Author
 
@@ -87,5 +90,4 @@ Norio Nomura
 
 ## License
 
-CLI Discord Bot is available under the MIT license. See the LICENSE file for
-more info.
+Swift Compiler Discord Bot is available under the MIT license. See the [LICENSE](LICENSE) file for more information.
