@@ -420,18 +420,10 @@ USER $USERNAME
 # Install Bot Source Code
 WORKDIR /bot
 
-# Cache Dependencies
-COPY deps.ts ./
-RUN <<'EOF'
-    DENO_ARGS=(--quiet)
-    [[ "$(deno -v)" == "deno 1."* ]] || DENO_ARGS+=(
-        "--allow-import=deno.land:443,raw.githubusercontent.com:443,unpkg.com:443"
-    )
-    deno cache "${DENO_ARGS[@]}" ./deps.ts
-EOF
+COPY --from=ghcr.io/norio-nomura/cli_discord_bot2 /usr/local/bin/cli_discord_bot2 /usr/local/bin/
 
 # Install remains
-COPY bot.ts entrypoint.sh ./
+COPY entrypoint.sh ./
 
 # Start Bot
 ENTRYPOINT [ "./entrypoint.sh" ]

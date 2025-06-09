@@ -30,26 +30,26 @@ test -z "${DISCORD_PLAYING}" && unset DISCORD_PLAYING
 export TARGET_CLI=${TARGET_CLI:-swift}
 export TARGET_ARGS_TO_USE_STDIN=${TARGET_ARGS_TO_USE_STDIN:--}
 
+allowed_env_keys=(
+	ATTACHMENT_EXTENSION_TO_TREAT_AS_INPUT
+	DISCORD_NICKNAME
+	DISCORD_PLAYING
+	DISCORD_TOKEN
+	ENV_COMMAND
+	HTTP_PROXY
+	HTTPS_PROXY
+	NUMBER_OF_LINES_TO_EMBED_OUTPUT
+	NUMBER_OF_LINES_TO_EMBED_UPLOADED_OUTPUT
+	PATH
+	REST_TIMEOUT_SECONDS
+	TARGET_ARGS_TO_USE_STDIN
+	TARGET_CLI
+	TARGET_DEFAULT_ARGS
+	TIMEOUT_SECONDS
+)
 vars=()
-for v in DENO_TLS_CA_STORE HTTP_PROXY HTTPS_PROXY PATH; do
-	vars=("${vars[@]}" "${!v+${v}=${!v}}")
+for v in "${allowed_env_keys[@]}"; do
+	test -n "${!v}" && vars=("${vars[@]}" "${!v+${v}=${!v}}")
 done
 
-DENO_ARGS=(
-	--allow-env="PATH"
-	--allow-net
-	--allow-run=/usr/bin/env
-	--allow-read="${TMPDIR:-/tmp}"
-	--allow-write="${TMPDIR:-/tmp}"
-	--quiet
-)
-
-[[ "$(deno -v)" == "deno 1."* ]] || DENO_ARGS+=(
-	--allow-import="deno.land:443,raw.githubusercontent.com:443,unpkg.com:443"
-)
-
-# Avoid passing options via environment variables or comandline arguments
-# shellcheck disable=SC2068
-exec env -i ${vars[@]} deno run "${DENO_ARGS[@]}" "$@" bot.ts <<EOF
-$(deno eval 'import { printOptionsFromEnv } from "./deps.ts"; printOptionsFromEnv();')
-EOF
+exec env -i "${vars[@]}" /usr/local/bin/cli_discord_bot2
