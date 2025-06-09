@@ -4,32 +4,5 @@
   // 詳細情報は次を確認してください: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
-    {
-      "name": "Debug Bot",
-      "type": "node",
-      "request": "launch",
-      "linux": {
-        "runtimeExecutable": "sudo",
-        "runtimeArgs": [
-          "-u",
-          "bot",
-          "--preserve-env=DISCORD_TOKEN,GITHUB_TOKEN,HTTP_PROXY,HTTPS_PROXY",
-          "${workspaceFolder}/entrypoint.sh",
-          "--cert=${workspaceFolder}/.devcontainer/charles-ssl-proxying-certificate.crt",
-          "--inspect-wait"
-        ],
-        "attachSimplePort": 9229,
-        "console": "integratedTerminal",
-        "envFile": "${workspaceFolder}/dot.env",
-      },
-      "osx": {
-        "runtimeExecutable": "bash",
-        "runtimeArgs": [
-          "-c",
-          "echo 'Debug Bot' requires container! >&2; exit 1"
-        ],
-        "internalConsoleOptions": "openOnSessionStart"
-      },
-    }
   ]
 }

@@ -283,7 +283,7 @@ FROM use-${SWIFT_IMAGE_SELECTOR} AS prepare-dependencies
 
 # setup user account for running bot
 ARG USERNAME=bot
-RUN mkdir -p /etc/skel/.cache/deno && useradd -m $USERNAME
+RUN useradd -m $USERNAME
 
 # install tools
 WORKDIR /usr/local/bin
@@ -332,13 +332,6 @@ RUN --mount=type=cache,sharing=locked,target=/var/cache/apt,id=${TARGETARCH} --m
 
 # install github-release-artifact-with-pattern script
 COPY --from=github-release-artifact-with-pattern github-release-artifact-with-pattern /usr/local/bin/
-
-# install deno
-RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
-    github-release-artifact-with-pattern "denoland/deno" 'deno-'"$(arch)"'-unknown-linux-gnu.zip$' v1.46.3 | funzip >deno
-    chmod +x deno
-    deno --version
-EOF
 
 # install swift-* wrapper scripts
 COPY --chmod=755 swift-wrappers/swift-+ /usr/bin/
@@ -420,18 +413,10 @@ USER $USERNAME
 # Install Bot Source Code
 WORKDIR /bot
 
-# Cache Dependencies
-COPY deps.ts ./
-RUN <<'EOF'
-    DENO_ARGS=(--quiet)
-    [[ "$(deno -v)" == "deno 1."* ]] || DENO_ARGS+=(
-        "--allow-import=deno.land:443,raw.githubusercontent.com:443,unpkg.com:443"
-    )
-    deno cache "${DENO_ARGS[@]}" ./deps.ts
-EOF
+COPY --from=ghcr.io/norio-nomura/cli_discord_bot2 /usr/local/bin/cli_discord_bot2 /usr/local/bin/
 
 # Install remains
-COPY bot.ts entrypoint.sh ./
+COPY entrypoint.sh ./
 
 # Start Bot
 ENTRYPOINT [ "./entrypoint.sh" ]

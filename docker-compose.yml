@@ -19,7 +19,6 @@ services:
       - DISCORD_NICKNAME
       - DISCORD_PLAYING
       - DISCORD_TOKEN
-      - ENV_ARGS
       - ENV_COMMAND
       - GITHUB_TOKEN
       - NUMBER_OF_LINES_TO_EMBED_OUTPUT
@@ -27,8 +26,7 @@ services:
       - TARGET_ARGS_TO_USE_STDIN
       - TARGET_CLI
       - TARGET_DEFAULT_ARGS
-      - TIMEOUT_ARGS=--signal=KILL 120
-      - TIMEOUT_COMMAND
+      - TIMEOUT_SECONDS=120
     tty: true
 secrets:
   github_token:
