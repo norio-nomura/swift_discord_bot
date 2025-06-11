@@ -117,7 +117,6 @@ jobs:
 
   merge:
     runs-on: ubuntu-latest
-    environment: ${{ github.ref_name }}
     needs:
       - build
     steps:
@@ -160,8 +159,14 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
+  deploy:
+    if: github.event_name == 'push' && startsWith(github.ref_name, 'swift/')
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name }}
+    needs:
+      - merge
+    steps:
       - name: Deploy
-        if: github.event_name == 'push' && startsWith(github.ref_name, 'swift/')
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
