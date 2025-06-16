@@ -269,11 +269,11 @@ RUN --mount=type=cache,target=/root/.cache --mount=type=tmpfs,target=${WASMKIT_B
     # download wasmkit source code
     curl -fLsS "https://github.com/swiftwasm/wasmkit/archive/refs/tags/${tag}.tar.gz" | tar zxf - --no-same-owner --strip-component=1
 
-    # build wasmkit-cli
+    # build wasmkit
     BUILD_FLAGS=(--static-swift-stdlib -c release --product wasmkit-cli)
     swift build "${BUILD_FLAGS[@]}"
-    install -D -t /usr/bin "$(swift build --show-bin-path "${BUILD_FLAGS[@]}")/wasmkit-cli"
-    wasmkit-cli --version
+    install -T "$(swift build --show-bin-path "${BUILD_FLAGS[@]}")/wasmkit-cli"  /usr/local/bin/wasmkit
+    /usr/local/bin/wasmkit --version
 EOF
 
 ####################################################################################################
@@ -353,8 +353,8 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
     wasmer-headless --version
 EOF
 
-# install wasmkit-cli
-COPY --from=wasmkit-builder /usr/bin/wasmkit-cli /usr/local/bin/
+# install wasmkit
+COPY --from=wasmkit-builder /usr/local/bin/wasmkit /usr/local/bin/
 
 # install wasmtime
 RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
