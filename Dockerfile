@@ -53,6 +53,23 @@ ARG SWIFT_SDKS_SELECTOR=${_PARSE_USE_SWIFT_SDKS:+dependencies}
 # if empty, USE_SWIFT_SDKS is true, install swift sdks
 ARG SWIFT_SDKS_SELECTOR=${SWIFT_SDKS_SELECTOR:-swift-sdks}
 
+# build arg to control whether to build the wasmkit or not
+# if USE_SNAPSHOT is false, this arg is ignored
+ARG BUILD_WASMKIT
+ARG _PARSE_BUILD_WASMKIT=${BUILD_WASMKIT:-false}
+# remove truthy values
+ARG _PARSE_BUILD_WASMKIT=${_PARSE_BUILD_WASMKIT#ON}
+ARG _PARSE_BUILD_WASMKIT=${_PARSE_BUILD_WASMKIT#on}
+ARG _PARSE_BUILD_WASMKIT=${_PARSE_BUILD_WASMKIT#TRUE}
+ARG _PARSE_BUILD_WASMKIT=${_PARSE_BUILD_WASMKIT#true}
+ARG _PARSE_BUILD_WASMKIT=${_PARSE_BUILD_WASMKIT#YES}
+ARG _PARSE_BUILD_WASMKIT=${_PARSE_BUILD_WASMKIT#yes}
+ARG _PARSE_BUILD_WASMKIT=${_PARSE_BUILD_WASMKIT#1}
+# if not empty, BUILD_WASMKIT is false, do not build wasmkit
+ARG WASMKIT_BUILDER_SELECTOR=${_PARSE_BUILD_WASMKIT:+dependencies}
+# if empty, BUILD_WASMKIT is true, build wasmkit
+ARG WASMKIT_BUILDER_SELECTOR=${WASMKIT_BUILDER_SELECTOR:-from-wasmkit-builder}
+
 ####################################################################################################
 # helpser scripts
 ####################################################################################################
@@ -340,9 +357,17 @@ COPY --chmod=755 swift-wrappers/swift-+ /usr/bin/
 RUN /usr/bin/swift-+ --install-shortcuts
 
 ####################################################################################################
+# prepare-from-wasmkit-builder
+####################################################################################################
+FROM prepare-dependencies AS prepare-from-wasmkit-builder
+
+# install wasmkit from the wasmkit-builder stage
+COPY --from=wasmkit-builder /usr/local/bin/wasmkit /usr/local/bin/
+
+####################################################################################################
 # prepare-swift-sdks
 ####################################################################################################
-FROM prepare-dependencies AS prepare-swift-sdks
+FROM prepare-${WASMKIT_BUILDER_SELECTOR} AS prepare-swift-sdks
 
 USER root
 WORKDIR /usr/local/bin
@@ -352,9 +377,6 @@ RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
     github-release-artifact-with-pattern "wasmerio/wasmer" 'linux-'"$(arch)"'.tar.gz$' v6.0.0-alpha.2 | tar xzf - --directory .. --no-same-owner
     wasmer-headless --version
 EOF
-
-# install wasmkit
-COPY --from=wasmkit-builder /usr/local/bin/wasmkit /usr/local/bin/
 
 # install wasmtime
 RUN --mount=type=secret,id=github_token,env=GITHUB_TOKEN <<EOF
