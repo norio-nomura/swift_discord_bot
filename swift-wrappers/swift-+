@@ -34,15 +34,15 @@ Usage: swift + [subcommand ...] [options for swift]
         darwin-deployment-target <triple> <platform>  Print default deployment target.
 
 # Subcommands to execute main with WASI runtime:
-    exec-wasi    Use the default WASI runtime (wasmkit-cli).
-    wasmkit-cli
+    exec-wasi    Use the default WASI runtime (wasmkit).
+    wasmkit
     wasmtime
     wazero
     * If multiple WASI runtimes are specified, they will be executed sequentially.
 
 # Usage examples:
 
-## Compile the code with SwiftWasm SDK and execute it with wasmkit-cli
+## Compile the code with SwiftWasm SDK and execute it with wasmkit
 
 echo 'print("Hello, WASI!")' | swift + wasi -
 
@@ -612,7 +612,7 @@ function swift-wasm32() { swift-wasi "$@"; }
 # compile the code with the wasm sdk, then execute it with wasm runtime
 function swift-exec-wasi() {
 	if [[ ${1:-} == "--list-runtimes" ]]; then
-		echo wasmkit-cli wasmtime wazero
+		echo wasmkit wasmtime wazero
 		exit
 	fi
 
@@ -627,8 +627,8 @@ function swift-exec-wasi() {
 
 	set +e
 	case "${SWIFT_PLUS_CURRENT}" in
-	exec-wasi | wasmkit-cli)
-		call_command wasmkit-cli run --dir . main "$@"
+	exec-wasi | wasmkit)
+		call_command wasmkit run --dir . main "$@"
 		;;
 	wasmtime)
 		call_command wasmtime run --dir . main "$@"
@@ -647,7 +647,7 @@ function swift-exec-wasi() {
 	exit "${status}"
 }
 
-function swift-wasmkit-cli() { swift-exec-wasi "$@"; }
+function swift-wasmkit() { swift-exec-wasi "$@"; }
 function swift-wasmtime() { swift-exec-wasi "$@"; }
 function swift-wazero() { swift-exec-wasi "$@"; }
 
