@@ -97,6 +97,24 @@ function swift_tag_patterns_from_swift_version() {
 	echo "${patterns[@]}"
 }
 
+function print_swift_sdk_development_snapshot_hash_and_url() {
+	local pattern sdk_name="${1}" sdk_yml_url sdk_json swift_version="${2}" webroot
+	webroot="${swift_version//DEVELOPMENT-SNAPSHOT-*/branch}"
+	webroot="$(sed -E 's/^(swift-[0-9]+\.[0-9]+)(\.[0-9]+)?-RELEASE$/\1-branch/' <<<"${webroot}")"
+	[[ ${webroot} == swift-branch ]] && webroot="development"
+	sdk_yml_url="https://github.com/swiftlang/swift-org-website/raw/refs/heads/main/_data/builds/${webroot/\./_}/${sdk_name/-/_}.yml"
+	sdk_json="$(curl -fLs "${sdk_yml_url}" "${sdk_yml_url/_sdk/-sdk}" -o - | yq -o=json -)"
+	[[ ${sdk_json} == null ]] && return
+	for pattern in $(swift_tag_patterns_from_swift_version "${swift_version}"); do
+		# shellcheck disable=SC2016,SC2086
+		jq -e -r '
+			map(select(.dir|test("'${pattern}'")))
+			|map("\(.checksum) https://download.swift.org/'"${webroot}"'/'"${sdk_name}"'/\(.dir)/\(.download)")
+			|first // empty
+		' <<<"${sdk_json}" && return
+	done	
+}
+
 function query_swiftwasm_tag() {
 	local swift_version="${1}" pattern
 	for pattern in $(swift_tag_patterns_from_swift_version "${swift_version}"); do
@@ -113,27 +131,16 @@ function print_swiftsdk_from_swiftwasm_tag() {
 }
 
 function print_swiftwasm_sdk_hash_and_url() {
+	local development_snapshot_hash_and_url
+	development_snapshot_hash_and_url=$(print_swift_sdk_development_snapshot_hash_and_url "wasm-sdk" "${1}")
+	[[ -n ${development_snapshot_hash_and_url} ]] && echo "${development_snapshot_hash_and_url}" && return
 	SWIFTWASM_TAG="$(query_swiftwasm_tag "${1}")"
 	[[ -z ${SWIFTWASM_TAG} ]] && return
 	print_swiftsdk_from_swiftwasm_tag "${SWIFTWASM_TAG}"
 }
 
 function print_swift_static_sdk_development_snapshot_hash_and_url() {
-	local pattern static_sdk_yml_url static_sdk_json swift_version="${1}" webroot
-	webroot="${swift_version//DEVELOPMENT-SNAPSHOT-*/branch}"
-	webroot="$(sed -E 's/^(swift-[0-9]+\.[0-9]+)(\.[0-9]+)?-RELEASE$/\1-branch/' <<<"${webroot}")"
-	[[ ${webroot} == swift-branch ]] && webroot="development"
-	static_sdk_yml_url="https://github.com/swiftlang/swift-org-website/raw/refs/heads/main/_data/builds/${webroot/\./_}/static_sdk.yml"
-	static_sdk_json="$(curl -fLsS "${static_sdk_yml_url}" -o - | yq -o=json -)"
-	[[ ${static_sdk_json} == null ]] && return
-	for pattern in $(swift_tag_patterns_from_swift_version "${swift_version}"); do
-		# shellcheck disable=SC2016,SC2086
-		jq -e -r '
-			map(select(.dir|test("'${pattern}'")))
-			|map("\(.checksum) https://download.swift.org/'"${webroot}"'/static-sdk/\(.dir)/\(.download)")
-			|first // empty
-		' <<<"${static_sdk_json}" && return
-	done
+	print_swift_sdk_development_snapshot_hash_and_url "static-sdk" "${1}"
 }
 
 function print_swift_static_sdk_release_hash_and_url() {
