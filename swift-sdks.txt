@@ -1,0 +1,2 @@
+24bdf84495dd31a6de2eb679647c1982b747bfbfe1a2060c779d84dcecd902a4 https://download.swift.org/swift-6.2.4-release/static-sdk/swift-6.2.4-RELEASE/swift-6.2.4-RELEASE_static-linux-0.1.0.artifactbundle.tar.gz
+95626bb7c1372f1c3b1fa4c7817b56a52ad4c842e19ad26083b4948a5021a5ee https://download.swift.org/swift-6.2-branch/wasm-sdk/swift-6.2-DEVELOPMENT-SNAPSHOT-2025-12-03-a/swift-6.2-DEVELOPMENT-SNAPSHOT-2025-12-03-a_wasm.artifactbundle.tar.gz
