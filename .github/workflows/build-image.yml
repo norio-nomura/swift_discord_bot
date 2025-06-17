@@ -64,11 +64,7 @@ jobs:
           else
             ref=${GITHUB_REF_NAME/\//-}
           fi
-          if [ "${{ needs.parse-docker-compose.outputs.use-swift-sdks }}" = "true" ]; then
-            cache_param="type=gha,scope=${ref}-$(dpkg --print-architecture)"
-          else
-            cache_param="type=registry,ref=${REGISTRY_IMAGE}:cache-${ref}-$(dpkg --print-architecture)"
-          fi
+          cache_param="type=registry,ref=${REGISTRY_IMAGE}:cache-${ref}-$(dpkg --print-architecture)"
           echo "cache-from=${cache_param}" >> $GITHUB_OUTPUT
           echo "cache-to=${cache_param},mode=max" >> $GITHUB_OUTPUT
 
