@@ -1,8 +1,12 @@
 # syntax=docker/dockerfile:1
 ARG SWIFT_PLATFORM=ubuntu
+ARG SWIFT_VERSION
 ARG PLATFORM_CODENAME=noble
 ARG PLATFORM_IMAGE=${SWIFT_PLATFORM}:${PLATFORM_CODENAME}
+ARG DOCKER_IMAGE=swift:${SWIFT_VERSION:+${SWIFT_VERSION}-}${PLATFORM_CODENAME}
 
+# build PLATFORM_WEBROOT based on the platform and version
+ARG SWIFT_WEBROOT=https://download.swift.org/development
 ARG OS_MAJOR_VER=${PLATFORM_CODENAME}
 ARG OS_MAJOR_VER=${OS_MAJOR_VER/xenial/16}
 ARG OS_MAJOR_VER=${OS_MAJOR_VER/bionic/18}
@@ -15,10 +19,10 @@ ARG OS_MIN_VER=${OS_MIN_VER/bionic/04}
 ARG OS_MIN_VER=${OS_MIN_VER/focal/04}
 ARG OS_MIN_VER=${OS_MIN_VER/jammy/04}
 ARG OS_MIN_VER=${OS_MIN_VER/noble/04}
-
-ARG SWIFT_VERSION
-ARG DOCKER_IMAGE=swift:${SWIFT_VERSION:+${SWIFT_VERSION}-}${PLATFORM_CODENAME}
-ARG SWIFT_WEBROOT=https://download.swift.org/development
+ARG OS_ARCH_SUFFIX=${TARGETARCH}
+ARG OS_ARCH_SUFFIX=${OS_ARCH_SUFFIX/amd64/}
+ARG OS_ARCH_SUFFIX=${OS_ARCH_SUFFIX/arm64/-aarch64}
+ARG PLATFORM_WEBROOT="${SWIFT_WEBROOT}/${SWIFT_PLATFORM}${OS_MAJOR_VER}${OS_MIN_VER}${OS_ARCH_SUFFIX}"
 
 # build arg to control whether to use a pre-built image or build the snapshot image here
 ARG USE_SNAPSHOT
@@ -137,21 +141,13 @@ EOF
 ####################################################################################################
 FROM ${PLATFORM_IMAGE} AS swift-toolchain-downloader
 SHELL ["/bin/bash", "-eu", "-o", "pipefail", "-c"]
+ARG PLATFORM_WEBROOT
 ARG TARGETARCH
 
 # install /usr/local/bin/apt-get-update script
 COPY --from=apt-get-update /* /usr/local/bin/
 
 # download Swift toolchain
-ARG SWIFT_WEBROOT #=https://download.swift.org/development
-ARG SWIFT_PLATFORM #=ubuntu
-ARG OS_MAJOR_VER #=24
-ARG OS_MIN_VER #=04
-ARG OS_ARCH_SUFFIX=${TARGETARCH}
-ARG OS_ARCH_SUFFIX=${OS_ARCH_SUFFIX/amd64/}
-ARG OS_ARCH_SUFFIX=${OS_ARCH_SUFFIX/arm64/-aarch64}
-ARG PLATFORM_WEBROOT="${SWIFT_WEBROOT}/${SWIFT_PLATFORM}${OS_MAJOR_VER}${OS_MIN_VER}${OS_ARCH_SUFFIX}"
-
 WORKDIR /swift-toolchain
 # Use ADD to invalidate cache, if latest-build.yml has been changed
 ADD ${PLATFORM_WEBROOT}/latest-build.yml .

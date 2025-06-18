@@ -22,11 +22,6 @@ jobs:
         id: ["4.0", "4.1", "4.2", "5.0", "5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "5.8", "5.9", "5.10", "6.0", "6.1", "6.2", "main"]
         repository: ["library/swift"]
         tag: [""]
-        include:
-          - id: '6.2'
-            swift_webroot: 'https://download.swift.org/swift-6.2-branch/ubuntu2404'
-          - id: 'main'
-            swift_webroot: 'https://download.swift.org/development/ubuntu2404'
 
     steps:
       - uses: actions/checkout@v3
@@ -43,8 +38,17 @@ jobs:
           timestamp=$(git show -s --format=%ct) &&
           echo "timestamp=${timestamp}" >> $GITHUB_OUTPUT
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Parse Docker Compose
+        id: build-args
+        run: |
+          touch .github_token # Ensure the file exists for the build context
+          echo "platform_webroot=$(docker buildx bake --progress=quiet --call outline|awk '/^PLATFORM_WEBROOT/{print $2}')" >> $GITHUB_OUTPUT
+
       - name: Check Docker Image
-        if: ${{ !inputs.force-update && !startsWith(matrix.swift_webroot, 'https:') }}
+        if: ${{ !inputs.force-update && !startsWith(steps.build-args.outputs.platform_webroot, 'https:') }}
         id: check-image
         env:
           ID: ${{ matrix.id }}
@@ -59,10 +63,10 @@ jobs:
           echo "timestamp=${timestamp}" >> $GITHUB_OUTPUT
 
       - name: Check Development Snapshots
-        if: ${{ !inputs.force-update && startsWith(matrix.swift_webroot, 'https:') }}
+        if: ${{ !inputs.force-update && startsWith(steps.build-args.outputs.platform_webroot, 'https:') }}
         id: check-snapshot
         run: |
-          endpoint="${{ matrix.swift_webroot }}/latest-build.yml"
+          endpoint="${{ steps.build-args.outputs.platform_webroot }}/latest-build.yml"
           latest_build_date=$(curl --silent "${endpoint}"|sed -n '/^date:/s/date: *//p') &&
           timestamp=$(date -d "${latest_build_date}" "+%s") &&
           echo "timestamp=${timestamp}" >> $GITHUB_OUTPUT
