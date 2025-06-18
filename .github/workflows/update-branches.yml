@@ -13,13 +13,43 @@ on:
         required: false
 
 jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      ids: ${{ steps.query-ids.outputs.ids }}
+    steps:
+      - name: Query ids
+        id: query-ids
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ids=$(
+            gh api graphql -F owner=${{ github.repository_owner }} -F name=${{ github.event.repository.name }} --paginate -f query='
+              query($owner: String!, $name: String!, $endCursor: String) {
+                repository(owner: $owner, name: $name) {
+                  refs(refPrefix: "refs/heads/swift/", first: 100, after: $endCursor) {
+                    nodes {
+                      name
+                    }
+                    pageInfo {
+                      hasNextPage
+                      endCursor
+                    }
+                  }
+                }
+              }
+            ' --jq '[.data.repository.refs.nodes[].name]' | jq -c
+          )
+          echo "ids=${ids}" >> $GITHUB_OUTPUT
+
   update_branches:
+    needs: prepare-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 1
       matrix:
-        id: ["4.0", "4.1", "4.2", "5.0", "5.1", "5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "5.8", "5.9", "5.10", "6.0", "6.1", "6.2", "main"]
+        id: ${{ fromJSON(needs.prepare-matrix.outputs.ids) }}
         repository: ["library/swift"]
         tag: [""]
 
