@@ -413,17 +413,29 @@ function swift-sdk-configuration() {
 		jsons=(~/{.swiftpm,Library/org.swift.swiftpm}/swift-sdks/*/info.json)
 		[[ ${#jsons[@]} -ne 0 ]] || error_exit "${FUNCNAME[0]}" "No info.json files found in swift-sdks"
 		jq --raw-output '
-			.artifacts|to_entries[]|.key as $sdk_id|.value|.variants[]|{((input_filename|sub("[^/]+$";""))+.path+"/swift-sdk.json"): $sdk_id}
+			.artifacts|to_entries[]|.key as $sdk_id|.value|.variants[]|{((input_filename|sub("[^/]+$";""))+.path): $sdk_id}
 		' "${jsons[@]}" | jq --slurp 'add' # use separated jq to avoid incorrect input_filename with --slurp
 	) || return
 	swift_sdk_jsons_list=$(jq -r 'keys[]' <<<"${swift_sdk_json_to_sdk_id}")
-	while read -r line; do swift_sdk_jsons+=("${line}"); done <<<"${swift_sdk_jsons_list}"
+	while read -r line; do
+		if [[ -f "${line}" ]]; then
+			swift_sdk_jsons+=("${line}")
+		elif [[ -d "${line}" ]]; then
+			# if the line is a directory, find swift-sdk.json files in it
+			swift_sdk_jsons+=("${line}/swift-sdk.json")
+			swift_sdk_json_to_sdk_id=$(
+				jq ".[\"${line}/swift-sdk.json\"] = .[\"${line}\"]| del(.[\"${line}\"])" <<<"${swift_sdk_json_to_sdk_id}"
+			)
+		else
+			error_exit "${FUNCNAME[0]}" "swift-sdk.json not found: ${line}"
+		fi
+	done <<<"${swift_sdk_jsons_list}"
 	[[ ${#swift_sdk_jsons[@]} -ne 0 ]] || error_exit "${FUNCNAME[0]}" "No swift-sdk.json files found in swift-sdks"
 
 	# { target_triple: { sdk_id: sdk_configuration } }
 	sdk_configurations=$(
 		jq --argjson sdk_ids "${swift_sdk_json_to_sdk_id}" '
-			.targetTriples|map_values(.root = (input_filename|rtrimstr("swift-sdk.json")))|map_values({($sdk_ids[input_filename]):.})
+			.targetTriples|map_values(.root = (input_filename|sub("[^/]+$";"")))|map_values({($sdk_ids[input_filename]):.})
 		' "${swift_sdk_jsons[@]}" | jq --slurp '
 			map(to_entries[])|reduce .[] as $x ({}; .[$x.key] += $x.value)
 		' # use separated jq to avoid incorrect input_filename with --slurp
