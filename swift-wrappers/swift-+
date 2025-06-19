@@ -332,7 +332,7 @@ function swift-args-for-sdk() {
 				, ("-tools-directory",$rootPath|("-Xfrontend",.))
 				, (.swiftCompiler?.extraCLIOptions[]?)
 				, (.cCompiler?.extraCLIOptions[]?|("-Xcc",.))
-				, (.cxxCompiler?.extraCLIOptions[]?|("-Xcxx",.))
+				# , (.cxxCompiler?.extraCLIOptions[]?|("-Xcxx",.)) # toolset.json has cxxCompiler.extraCLIOptions field, but -Xcxx is not supported by swiftc.
 				, (.linker?.extraCLIOptions[]?|("-Xlinker",.))
 			' "${toolsetPath}" || error_exit "${FUNCNAME[0]}" "Failed to parse ${toolsetPath}"
 		done
