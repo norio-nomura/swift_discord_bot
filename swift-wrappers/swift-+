@@ -339,7 +339,7 @@ function swift-args-for-sdk() {
 	) || error_exit "${FUNCNAME[0]}" "Failed to parse toolsetPaths"
 	while read -r line; do SWIFT_ARGS_FOR_SDK+=("${line}"); done <<<"${flags_from_toolsets}"
 
-	[[ " ${SWIFT_ARGS_FOR_SDK[*]} $* " == *" -static-stdlib "* ]] && isStatic="Static"
+	# [[ " ${SWIFT_ARGS_FOR_SDK[*]} $* " == *" -static-stdlib "* ]] && isStatic="Static"
 
 	flags_from_sdk_configuration=$(
 		jq --raw-output --arg resourcePathKey "swift${isStatic:-}ResourcesPath" '
