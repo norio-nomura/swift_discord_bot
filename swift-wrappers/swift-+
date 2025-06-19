@@ -243,6 +243,7 @@ function prepare_swift_args_for_sdk_and_use_swiftc() {
 		s/^(arm64|x86_64)-apple-ios([0-9.]+)?-macabi$/\1-apple-macosx/p
 		s/^(aarch64|x86_64)-swift-linux-musl$/\1-swift-linux-musl/p
 		s/^wasm32-unknown-wasi$/wasm32-unknown-wasi\t1/p
+		s/^wasm32-unknown-wasip1$/wasm32-unknown-wasip1\t1/p
 	' <<<"${target_triple}")
 	read -r sdk_triple USE_SWIFTC <<<"${sdk_triple_use_swiftc}"
 	[[ -n ${sdk_triple:-} ]] || error_exit "${0}" "Unknown target: ${target_triple}"
@@ -331,7 +332,7 @@ function swift-args-for-sdk() {
 				, ("-tools-directory",$rootPath|("-Xfrontend",.))
 				, (.swiftCompiler?.extraCLIOptions[]?)
 				, (.cCompiler?.extraCLIOptions[]?|("-Xcc",.))
-				, (.cxxCompiler?.extraCLIOptions[]?|("-Xcxx",.))
+				# , (.cxxCompiler?.extraCLIOptions[]?|("-Xcxx",.)) # toolset.json has cxxCompiler.extraCLIOptions field, but -Xcxx is not supported by swiftc.
 				, (.linker?.extraCLIOptions[]?|("-Xlinker",.))
 			' "${toolsetPath}" || error_exit "${FUNCNAME[0]}" "Failed to parse ${toolsetPath}"
 		done
@@ -413,17 +414,29 @@ function swift-sdk-configuration() {
 		jsons=(~/{.swiftpm,Library/org.swift.swiftpm}/swift-sdks/*/info.json)
 		[[ ${#jsons[@]} -ne 0 ]] || error_exit "${FUNCNAME[0]}" "No info.json files found in swift-sdks"
 		jq --raw-output '
-			.artifacts|to_entries[]|.key as $sdk_id|.value|.variants[]|{((input_filename|sub("[^/]+$";""))+.path+"/swift-sdk.json"): $sdk_id}
+			.artifacts|to_entries[]|.key as $sdk_id|.value|.variants[]|{((input_filename|sub("[^/]+$";""))+.path): $sdk_id}
 		' "${jsons[@]}" | jq --slurp 'add' # use separated jq to avoid incorrect input_filename with --slurp
 	) || return
 	swift_sdk_jsons_list=$(jq -r 'keys[]' <<<"${swift_sdk_json_to_sdk_id}")
-	while read -r line; do swift_sdk_jsons+=("${line}"); done <<<"${swift_sdk_jsons_list}"
+	while read -r line; do
+		if [[ -f "${line}" ]]; then
+			swift_sdk_jsons+=("${line}")
+		elif [[ -d "${line}" ]]; then
+			# if the line is a directory, find swift-sdk.json files in it
+			swift_sdk_jsons+=("${line}/swift-sdk.json")
+			swift_sdk_json_to_sdk_id=$(
+				jq ".[\"${line}/swift-sdk.json\"] = .[\"${line}\"]| del(.[\"${line}\"])" <<<"${swift_sdk_json_to_sdk_id}"
+			)
+		else
+			error_exit "${FUNCNAME[0]}" "swift-sdk.json not found: ${line}"
+		fi
+	done <<<"${swift_sdk_jsons_list}"
 	[[ ${#swift_sdk_jsons[@]} -ne 0 ]] || error_exit "${FUNCNAME[0]}" "No swift-sdk.json files found in swift-sdks"
 
 	# { target_triple: { sdk_id: sdk_configuration } }
 	sdk_configurations=$(
 		jq --argjson sdk_ids "${swift_sdk_json_to_sdk_id}" '
-			.targetTriples|map_values(.root = (input_filename|rtrimstr("swift-sdk.json")))|map_values({($sdk_ids[input_filename]):.})
+			.targetTriples|map_values(.root = (input_filename|sub("[^/]+$";"")))|map_values({($sdk_ids[input_filename]):.})
 		' "${swift_sdk_jsons[@]}" | jq --slurp '
 			map(to_entries[])|reduce .[] as $x ({}; .[$x.key] += $x.value)
 		' # use separated jq to avoid incorrect input_filename with --slurp
@@ -608,6 +621,16 @@ function swift-wasi() {
 }
 function swift-wasm() { swift-wasi "$@"; }
 function swift-wasm32() { swift-wasi "$@"; }
+
+function swift-wasip1() {
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	target_triple="wasm32-unknown-wasip1"
+	export USE_SWIFT_TARGET_TRIPLE=${target_triple}
+	export USE_SWIFTC=1
+	call_next_subcommands "$@"
+}
 
 # compile the code with the wasm sdk, then execute it with wasm runtime
 function swift-exec-wasi() {
