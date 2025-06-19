@@ -243,6 +243,7 @@ function prepare_swift_args_for_sdk_and_use_swiftc() {
 		s/^(arm64|x86_64)-apple-ios([0-9.]+)?-macabi$/\1-apple-macosx/p
 		s/^(aarch64|x86_64)-swift-linux-musl$/\1-swift-linux-musl/p
 		s/^wasm32-unknown-wasi$/wasm32-unknown-wasi\t1/p
+		s/^wasm32-unknown-wasip1$/wasm32-unknown-wasip1\t1/p
 	' <<<"${target_triple}")
 	read -r sdk_triple USE_SWIFTC <<<"${sdk_triple_use_swiftc}"
 	[[ -n ${sdk_triple:-} ]] || error_exit "${0}" "Unknown target: ${target_triple}"
@@ -620,6 +621,16 @@ function swift-wasi() {
 }
 function swift-wasm() { swift-wasi "$@"; }
 function swift-wasm32() { swift-wasi "$@"; }
+
+function swift-wasip1() {
+	# shellcheck disable=SC2310
+	prepare_next_subcommands "$@" && shift ${#next_subcommands[@]}
+
+	target_triple="wasm32-unknown-wasip1"
+	export USE_SWIFT_TARGET_TRIPLE=${target_triple}
+	export USE_SWIFTC=1
+	call_next_subcommands "$@"
+}
 
 # compile the code with the wasm sdk, then execute it with wasm runtime
 function swift-exec-wasi() {
