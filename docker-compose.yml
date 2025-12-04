@@ -4,8 +4,8 @@ services:
       args:
         BUILD_WASMKIT: false
         DOCKER_IMAGE: swift
-        SWIFT_WEBROOT: https://download.swift.org/development
-        USE_SNAPSHOT: false
+        SWIFT_WEBROOT: https://download.swift.org/swift-6.3-branch
+        USE_SNAPSHOT: true
         USE_SWIFT_SDKS: true
       platforms:
         - linux/amd64
