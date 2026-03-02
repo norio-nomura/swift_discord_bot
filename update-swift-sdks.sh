@@ -153,7 +153,7 @@ function print_swift_static_sdk_release_hash_and_url() {
 			map(select(.tag|test("'${pattern}'")))|last
 			|.tag as $tag
 			|[.platforms[]?|select(.platform|test("static-sdk"))]
-			|map("\(.checksum) https://download.swift.org/\($tag|ascii_downcase)/static-sdk/\($tag)/\($tag)_static-linux-0.0.1.artifactbundle.tar.gz")
+			|map("\(.checksum) https://download.swift.org/\($tag|ascii_downcase)/static-sdk/\($tag)/\($tag)_static-linux-\(.version).artifactbundle.tar.gz")
 			|last // empty
 		' <<<"${swift_releases_json}" && return
 	done
