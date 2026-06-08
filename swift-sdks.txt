@@ -1,0 +1,2 @@
+b46b17ebbb1c0fecf94f865e5e518d56fda5191af1b22bac5f913eabe8b3a5d0 https://download.swift.org/swift-6.4.x-branch/static-sdk/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-19-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-19-a_static-linux-0.1.0.artifactbundle.tar.gz
+725422c7bc1db7a4b87f3832fbe5ce60919f7ecf2560aa266d47b182c52a1cf5 https://download.swift.org/swift-6.4.x-branch/wasm-sdk/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-19-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-19-a_wasm.artifactbundle.tar.gz
