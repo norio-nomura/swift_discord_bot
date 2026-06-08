@@ -63,7 +63,7 @@ function detect_swift_version_from_docker_compose_yml() {
 	USE_SNAPSHOT="$(build_arg_from_docker_compose_yml "${docker_compose_yml}" USE_SNAPSHOT "")"
 	case "${USE_SNAPSHOT}" in
 	"ON" | "on" | "TRUE" | "true" | "YES" | "yes" | "1")
-		# swift-(\d+\.\d+-)?DEVELOPMENT-SNAPSHOT-\d+-\d+-\d+-a
+		# swift-(\d+\.\d+(\.x)?-)?DEVELOPMENT-SNAPSHOT-\d+-\d+-\d+-a
 		detect_swift_snapshot_version "${docker_compose_yml}"
 		;;
 	*)
