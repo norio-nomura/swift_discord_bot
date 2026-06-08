@@ -102,7 +102,7 @@ function print_swift_sdk_development_snapshot_hash_and_url() {
 	webroot="${swift_version//DEVELOPMENT-SNAPSHOT-*/branch}"
 	webroot="$(sed -E 's/^(swift-[0-9]+\.[0-9]+)(\.[0-9]+)?-RELEASE$/\1-branch/' <<<"${webroot}")"
 	[[ ${webroot} == swift-branch ]] && webroot="development"
-	sdk_yml_url="https://github.com/swiftlang/swift-org-website/raw/refs/heads/main/_data/builds/${webroot/\./_}/${sdk_name/-/_}.yml"
+	sdk_yml_url="https://github.com/swiftlang/swift-org-website/raw/refs/heads/main/_data/builds/${webroot//\./_}/${sdk_name}.yml"
 	sdk_json="$(curl -fLs "${sdk_yml_url}" "${sdk_yml_url/_sdk/-sdk}" -o - | yq -o=json -)"
 	[[ ${sdk_json} == null ]] && return
 	for pattern in $(swift_tag_patterns_from_swift_version "${swift_version}"); do
